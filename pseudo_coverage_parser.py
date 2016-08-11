@@ -29,17 +29,18 @@ class Exome_coverage_parser():
 			if len(exome_coverage_files) == sample_iteration:
 			    sample_iteration += 1
 			    if 'r01_metrics' in root:
+				print '------match------'
 				coverage_dict = {}
                                 coverage_dict[exome_sample] = root + '/Coverage'
                                 print coverage_dict
                                 exome_coverage_files.append(coverage_dict)
+				print
 			    else:
-				print 'not in directories'
 			        match_count -= 1
 				sample_iteration -= 1
 		        else:
 			    pass
-        print exome_coverage_files
+        print str(exome_coverage_files) + '\n'
         return exome_coverage_files
 
     def line_strip_split(self, line):
@@ -61,6 +62,7 @@ class Exome_coverage_parser():
     #return { gene_symbol : '', transcript: '', transcript_coords : [start, stop], exons :{ transcript : '', [start, stop, CDS_boolean]}}
     #create the two separately then add them together to pass to the plotting function
     def gene_interval_parser(self, list_of_genes):
+	print 'calculating exon intervals from alamut coverage file \n'
         with open('/mnt/Data1/resources/alamut-genes/grch37_2016-05-10.txt', 'r') as alamut_genes:
             for line in alamut_genes:
                 for gene in list_of_genes:
@@ -108,17 +110,16 @@ class Exome_coverage_parser():
                     current_longest[-1] = item
             longest_transcripts.append(current_longest[-1])
         for item in longest_transcripts:
-            print item.__dict__
+            print str(item.__dict__) + '\n'
         return longest_transcripts
 
     #create a file containing the transcripts to be plotted
     def exon_interval_file_creator(self, transcript_instance):
+	print 'creating exon interval files'
         output_name = transcript_instance.__dict__['transcript_id']
         sorted_name = transcript_instance.__dict__['transcript_id'] + '.intervals'
         with open(output_name, 'a') as output_file:
             exon_dictionary = transcript_instance.__dict__['exons']
-            print exon_dictionary
-            print
             for k,v in exon_dictionary.iteritems():
                 output = k + ',' + v[0] + ',' + v[1] + '\n'
                 output_file.write(output)
@@ -134,23 +135,86 @@ class Exome_coverage_parser():
             subprocess.call(remove_command)
 
     def parse_coverage_file(self, list_of_transcript_instances, exome_id, coverage_file_location):
-        line_count = 0
-        #created plot data for each transcript/gene
         for item in list_of_transcript_instances:
-            instance_file_name = item.__dict__['gene_symbol'] + exome_id
-            print instance_file_name
-            with open(coverage_file_location, 'r') as coverage_data, open(instance_file_name, 'a') as output:
+            cds_length = self.exon_counter(item)
+            with open(coverage_file_location, 'r') as coverage_data:
                 header_list = coverage_data.readline().split()
                 print header_list
-#                for line in coverage_data:
-#                    if line.startswith(transcript_instance.__dict__['chromosome']):
-#                        split_line = line.split()
-#                        locus = split_line[0].split(':')
-#                        if int(locus[1]) >= int(start) and int(locus[1]) <= int(stop):
-#                            pass
-#                else:
-#		    pass
+                print coverage_file_location
+                match_sample_column = self.match_sample_to_column(header_list, exome_id)
+                print match_sample_column
+                locus_count = 0
+                locus_array = []
+                print str(item) + 'iteration'
+                instance_file_name = exome_id + '_' + item.__dict__['gene_symbol']
+                print instance_file_name
+                with open(instance_file_name, 'a') as output:
+                    print 'opened_output'
+                    for line in coverage_data:
+                        if line.startswith(item.__dict__['chromosome']):
+                            split_line = line.split()
+                            locus = split_line[0].split(':')
+                            if int(locus[1]) >= int(item.__dict__['transcript_start']) and int(locus[1]) <= int(item.__dict__['transcript_end']):
+                                locus_count += 1
+                                locus_array.append(split_line[match_sample_column[0]])
+                                print exome_id
+                                print header_list
+                                print split_line
+                                print 'depth: ' + str(split_line[match_sample_column[0]])
+                                print match_sample_column[1]
+			        print str(locus_count)
+				print len(locus_array)
+				print cds_length
+				print str(item.__dict__['transcript_length'])
+                            else:
+                                pass
 
+
+    def parse_coverage_filezzz(self, list_of_transcript_instances, exome_id, coverage_file_location):
+        with open(coverage_file_location, 'r') as coverage_data:
+            header_list = coverage_data.readline().split()
+	    print header_list
+	    print coverage_file_location
+	    match_sample_column = self.match_sample_to_column(header_list, exome_id)
+            print match_sample_column
+            for item in list_of_transcript_instances:
+                locus_count = 0
+                locus_array = []
+                print str(item) + 'iteration'
+                instance_file_name = exome_id + '_' + item.__dict__['gene_symbol']
+                print instance_file_name
+                with open(instance_file_name, 'a') as output:
+                    print 'opened_output'
+                    for line in coverage_data:
+	                if line.startswith(item.__dict__['chromosome']):
+			    split_line = line.split()
+			    locus = split_line[0].split(':')
+                            if int(locus[1]) >= int(item.__dict__['transcript_start']) and int(locus[1]) <= int(item.__dict__['transcript_end']):
+                                locus_count += 1
+                                locus_array.append(split_line[match_sample_column[0]])
+                                print exome_id
+				print split_line[match_sample_column[0]]
+                                print match_sample_column[1]
+				print header_list
+		        else:
+	                    pass
+		    
+
+    def match_sample_to_column(self, header_list, exome_identifier):
+        print header_list
+        print exome_identifier
+        y = 'Depth_for_' + exome_identifier        
+        for i, x in enumerate(header_list):  
+	    if x == y:
+		result = [i,x]
+	return result
+
+    def exon_counter(self, instance):
+        exon_total = 0
+        for k,v in instance.__dict__['exons'].iteritems():
+            distance = int(v[1]) - int(v[0])
+	    exon_total + distance
+	return exon_total
      
 class Transcript_instance():
 
@@ -161,24 +225,22 @@ class Transcript_instance():
         self.transcript_end = transcript_end
         self.transcript_length = int(transcript_end) - int(transcript_start)
         self.chromosome = chromosome
-        self.gene_start = g_stop
+        self.gene_start = g_start
         self.gene_stop = g_stop
         self.exons = {}
 
 #don't plot the genomic coordinate - include a buffer of 50 either side
 
-
 instance = Exome_coverage_parser(Transcript_instance)
 list_of_coverage_file_dicts = instance.exome_coverage_finder()
-#instance.gene_interval_parser(instance.list_from_file(instance.arg_dict['gene_names']))
-#list_of_longest_transcripts = instance.longest_transcript()
-#for item in list_of_longest_transcripts:
-#    instance.exon_interval_file_creator(item)
-#    instance.sorter(item.__dict__['transcript_id'])
-
-#for item in list_of_coverage_file_dicts:
-#    for k,v in item.iteritems():
-#        instance.parse_coverage_file(list_of_longest_transcripts, k, v)
+gene_intervals = instance.gene_interval_parser(instance.list_from_file(instance.arg_dict['gene_names']))
+list_of_longest_transcripts = instance.longest_transcript()
+for item in list_of_longest_transcripts:
+    instance.exon_interval_file_creator(item)
+    instance.sorter(item.__dict__['transcript_id'])
+for item in list_of_coverage_file_dicts:    
+    for k,v in item.iteritems():
+        instance.parse_coverage_file(list_of_longest_transcripts, k, v)
     
 
 
