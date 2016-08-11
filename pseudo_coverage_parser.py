@@ -150,11 +150,13 @@ class Exome_coverage_parser():
                 print instance_file_name
                 with open(instance_file_name, 'a') as output:
                     print 'opened_output'
+                    output.write('>' + instance_file_name + '\n')
                     for line in coverage_data:
                         if line.startswith(item.__dict__['chromosome']):
                             split_line = line.split()
                             locus = split_line[0].split(':')
                             if int(locus[1]) >= int(item.__dict__['transcript_start']) and int(locus[1]) <= int(item.__dict__['transcript_end']):
+                                output.write(locus[1] + ',' + str(split_line[match_sample_column[0]] + '\n')) 
                                 locus_count += 1
                                 locus_array.append(split_line[match_sample_column[0]])
                                 print exome_id
