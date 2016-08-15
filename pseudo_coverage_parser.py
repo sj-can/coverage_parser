@@ -118,15 +118,17 @@ class Exome_coverage_parser():
 	print 'creating exon interval files'
         output_name = transcript_instance.__dict__['transcript_id']
         sorted_name = transcript_instance.__dict__['transcript_id'] + '.intervals'
-        with open(output_name, 'a') as output_file:
+        with open(output_name, 'w') as output_file:
             exon_dictionary = transcript_instance.__dict__['exons']
             for k,v in exon_dictionary.iteritems():
-                output = k + ',' + v[0] + ',' + v[1] + '\n'
+                plus_50 = int(v[1]) + 50
+ 	        minus_50 = int(v[0]) - 50
+                output = k + ',' + v[0] + ',' + v[1] + ',' + str(minus_50) + ',' + str(plus_50) + '\n'
                 output_file.write(output)
 
     def sorter(self, file):
         output = 'transcript_intervals/' + file +'.intervals'
-        with open(output, 'a') as sorted_file:
+        with open(output, 'w') as sorted_file:
             command = ["sort", "-V", file]
             process = subprocess.Popen(command, stdout=subprocess.PIPE)
             sorted_output = process.communicate()[0]
@@ -148,7 +150,7 @@ class Exome_coverage_parser():
                 print str(item) + 'iteration'
                 instance_file_name = exome_id + '_' + item.__dict__['gene_symbol']
                 print instance_file_name
-                with open(instance_file_name, 'a') as output:
+                with open(instance_file_name, 'w') as output:
                     print 'opened_output'
                     output.write('>' + instance_file_name + '\n')
                     for line in coverage_data:
@@ -185,7 +187,7 @@ class Exome_coverage_parser():
                 print str(item) + 'iteration'
                 instance_file_name = exome_id + '_' + item.__dict__['gene_symbol']
                 print instance_file_name
-                with open(instance_file_name, 'a') as output:
+                with open(instance_file_name, 'w') as output:
                     print 'opened_output'
                     for line in coverage_data:
 	                if line.startswith(item.__dict__['chromosome']):
@@ -200,6 +202,13 @@ class Exome_coverage_parser():
 				print header_list
 		        else:
 	                    pass
+
+#start reading from a particular 
+#with open('dwn.txt') as f:
+#    for i in xrange(6):
+#        f.next()
+#    for line in f:
+#        process(line)
 		    
 
     def match_sample_to_column(self, header_list, exome_identifier):
