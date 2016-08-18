@@ -60,7 +60,7 @@ class Exome_coverage_parser():
 
     #parse the transcript start_stop and exon_intervals from the
     #/mnt/Data1/resources/alamut-genes/
-    #return { gene_symbol : '', transcript: '', transcript_coords : [start, stop], exons :{ transcript : '', [start, stop, CDS_boolean]}}
+    #return { gene_symbol : '', transcript: '', transcript_coords : [start, stop], exons :{ transcript : '', [start, stop]}}
     #create the two separately then add them together to pass to the plotting function
     def gene_interval_parser(self, list_of_genes):
         lines_parsed = 0
@@ -181,8 +181,12 @@ class Exome_coverage_parser():
 				print 'cds_length = ' + str(cds_length)
 				print 'transcript_length = ' + str(item.__dict__['transcript_length'])
 			    for k,v in item.__dict__['exons'].iteritems():
-				if int(locus[1]) >= int(k[0]) - 50 and int(locus[1]) <= int(k[1]) + 50:
-				    full_line.write(locus[1] + ',' + str(split_line[match_sample_column[0]]) + '\n')
+                                print k
+	                        print v
+				lower = int(v[0]) - 50
+				upper = int(v[1]) + 50
+				if int(locus[1]) >= lower and int(locus[1]) <= upper:
+				    full_line.write(str(locus[1]) + ',' + str(split_line[match_sample_column[0]]) + '\n')
                             else:
                                 pass
 
