@@ -213,6 +213,13 @@ class Exome_coverage_parser():
             distance = int(v[1]) - int(v[0]) + 1
 	    exon_total = exon_total + distance
 	return exon_total
+
+    #creates a new instance of a transcript from a line in the alamut file
+    def create_new_instance(self, line):
+        instance = self.alamut_file_instance(line[1], line[7], line[8], line[9], line[3], line[4], line[5])
+        instance.exons[line[12]] = [line[13], line[14]]
+        return instance
+
      
 class Transcript_instance():
 

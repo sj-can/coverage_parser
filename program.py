@@ -30,6 +30,7 @@ class Argument_handler():
 	    instance = Coverage_parser(self.arg_dict['sample_names'], self.arg_dict['gene_names'], '/mnt/Data1/resources/alamut-genes/grch37_2016-05-10.txt')
             instance.exome_coverage_finder()
 	    instance.find_gene_intervals()
+	    instance.longest_transcript()
 	    
 	else:	
 	    print 'ERROR - Input criteria not satisfied.'
@@ -123,6 +124,37 @@ class Coverage_parser(Transcript):
 			if self.transcript_instances[-1].transcript_id != line[7]:
 			    additional_transcript_instance = Transcript(line)
 			    self.transcript_instances.append(additional_transcript_instance)
+
+#need to account for it they are equal
+    def longest_transcript(self):
+        print 'finding longest transcript'
+        longest_transcripts = []
+	current_longest = []
+        #iterate through the gene list provided
+        print 'identifying longest transcripts'
+        for gene in self.sample_list:
+            print gene
+            this_gene = []
+            #current_longest = []
+            #iterate through the all transcript list of objects
+            for item in self.transcript_instances:
+                if gene == item.__dict__['gene_symbol']:
+                    if len(current_longest) == 0:
+                        this_gene.append(item)
+                        current_longest.append(item)
+                    elif len(current_longest) == 1:
+                        this_gene.append(item)
+            for item in this_gene:
+                current = current_longest[-1].__dict__['transcript_length']
+                challenger = item.__dict__['transcript_length']
+                if int(challenger) >= int(current):
+                    current_longest[-1] = item
+            longest_transcripts.append(current_longest[-1])
+        print 'the longest transcripts are:'
+        for item in longest_transcripts:
+            print str(item.__dict__['gene_symbol']) + ' ' + str(item.__dict__['transcript_id']) + '\n'
+        return longest_transcripts
+
 
 
 Argument_handler()
