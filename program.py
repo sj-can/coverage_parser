@@ -1,4 +1,4 @@
-import argparse, os, subprocess, fnmatch
+import argparse, os, subprocess, fnmatch, Gnuplot, Gnuplot.funcutils
 
 #initialises command line arguments and calls handler function that ensures all arguments have been passed
 class Argument_handler():
@@ -33,25 +33,57 @@ class Argument_handler():
 	    longest_transcript_list = instance.longest_transcript()
 	    for item in longest_transcript_list:
 		output_name = instance.exon_interval_file_creator(item)
-		print output_name
+		#print output_name
 		sorted_file = instance.sorter(output_name)
-		print sorted_file
-		transcript_range = instance.generate_transcript_range(sorted_file)
+		#print sorted_file
+		transcript_range = instance.generate_transcript_range(sorted_file, item)
 		print len(transcript_range)
-	        for item in list_coverage_file_dicts:
-		    for k,v in item.iteritems():
-			print v
+	        for sample_coverage_file in list_coverage_file_dicts:
+		    for k,v in sample_coverage_file.iteritems():
 			#need to return the correct covergae metric from each line
-		        x = instance.binary_search_coverage(transcript_range, v, k)
-			for item in x:
-			    print item
-			print str(len(x[1])) + ' loci are not in the coverage_file'
-			#check binary search is in the range and write coverage data to plottable output.
+		        binary_search_output = instance.binary_search_coverage(transcript_range, v, k)
+			x = instance.plottable_genomic_data(binary_search_output, transcript_range, k, item.gene_symbol)
+			extended = str(sorted_file) + '.extended'
+			exons = str(sorted_file) + '.exons'
+			gnuplot_instance = Gnuplotter(exons, extended, x, k, item.gene_symbol, '8878')
+		 	gnuplot_instance.coverage_plot()
 	    
 	else:	
 	    print 'ERROR - Input criteria not satisfied.'
 
 #Models a transcript using data from the Alamut genes file 
+
+class Gnuplotter():
+    def __init__(self, interval_exons, interval_extended, plottable_coverage, exome_identifier, gene, length_of_extended_transcript):
+        self.interval_exons = interval_exons
+	self.interval_extended = interval_extended
+	self.plottable_coverage = str(plottable_coverage)
+	self.exome_identifier = exome_identifier
+	self.gene = gene
+	self.length_of_extended_transcript = length_of_extended_transcript
+
+    def coverage_plot(self):
+	g = Gnuplot.Gnuplot(debug=1)
+	g('set terminal svg size 5000, 500')
+        file_name = str(self.gene) + '.svg'
+	output = 'set output ' + '"' + str(self.exome_identifier) + '_' + str(self.gene) + '.svg' + '"'
+	g(output)
+	g("set datafile separator ','")
+	g('set style line 1 lt 1 lw 2 lc 3')
+	g("set style line 2 lt 2 lw 10 lc rgb 'navy'")
+	g("set style line 3 lt 3 lw 1 lc rgb 'black'")
+	g("set object rect from 0,0 to 8878,0.2")
+	g("set style rect back fc rgb 'beige' fs solid 1.0 noborder")
+	g("min(a,b) = (a < b) ? a : b")
+	g("f(x) = min(1.0, (log(x + 10.0) - log(10.0)) / 4.0)")
+	g("set ytics ('0' f(0), '5' f(5), '10' f(10), '20' f(20), '40' f(40), '100' f(100), '200' f(200), '400' f(400), '800' f(800), '1600' f(1600))")
+	string_alternative = str(self.plottable_coverage)
+	print string_alternative
+	g('plot ' + '"' + string_alternative + '"' + ' using 1:(f($2)) with lines ls 3, ' + '-0.1 title ' + '"' + self.gene + '"' + ' with lines ls 3')
+# 0.2 title '20x' with lines ls 3, 0 title '' with lines ls 3, -0.1 title " + self.gene + " with lines ls 3, " + self.interval_exons + " with lines ls 2, " + self.interval_extended + " with lines ls 1")
+        #plotting_funciton_string = '"' + string_alternative + '"' + ' with lines'
+	#g.plot(Gnuplot.File(string_alternative, with_='lines ls 3'))
+
 class Transcript():
 
     def __init__(self, alamut_line):
@@ -69,7 +101,7 @@ class Transcript():
         self.exons = {self.alamut_line[12] : [self.alamut_line[13], self.alamut_line[14]]}
 
 #split this into three funcitons
-    def generate_transcript_range(self, input_file):
+    def generate_transcript_range(self, input_file, transcript_instance):
 	extended = []
 	exons = []
 	range_array = []
@@ -81,7 +113,7 @@ class Transcript():
 		exon = (int(split_line[2]) - int(split_line[1])) + 1
 		exons.append(exon)
             	for i in range(int(split_line[3]), int(split_line[4]) + 1, 1):
-                    i = ['11', str(i)]
+                    i = [str(transcript_instance.chromosome), str(i)]
                     range_array.append(i)
 	print exons
 	extended_intervals = input_file + '.extended'
@@ -116,11 +148,8 @@ class Transcript():
 			exon_interval_file.write(str(count2)+',-0.05\n')
 		    elif extension2 > end_of_exon:
 		        exon_interval_file.write('\n')
+	#print range_array
         return range_array
-
-#function to generate 
-#exons
-#extended
 
 class Coverage_parser(Transcript):
 
@@ -233,7 +262,7 @@ class Coverage_parser(Transcript):
                 plus_50 = int(v[1]) + 50
                 minus_50 = int(v[0]) - 50
                 output = k + ',' + v[0] + ',' + v[1] + ',' + str(minus_50) + ',' + str(plus_50) + '\n'
-                print output
+                #print output
                 output_file.write(output)
 	return output_name
 
@@ -257,7 +286,7 @@ class Coverage_parser(Transcript):
 	return result	 
 
     def binary_search_coverage(self, locus_array, coverage_file, exome_identifier):
-        in_file = []
+        in_file = {}
         not_in_file = []
         pos_iter_array = []
 	neg_iter_array = []
@@ -310,7 +339,8 @@ class Coverage_parser(Transcript):
 					#extract coverage_data
 					coverage_data = split_line2[header_index[0]]
 					#print header_index[1]
-                                        in_file.append([locus, coverage_data])
+                                        #in_file.append([locus, coverage_data])
+					in_file[locus] = coverage_data
                                         last_target_locus.append(target_locus2)
                                         items_checked += 1
                                         if neg_iter > 1:
@@ -332,9 +362,7 @@ class Coverage_parser(Transcript):
                                         if chrom_begin_array[-1] == chrom_begin_array[-2]:
                                             chrom_end_array.append(chrom_end_array[-1] + 1)
                                             if pos_inter >= 200:
-						#coverage_data == 0
-
-                                                not_in_file.append(locus)
+						not_in_file.append(locus)
 						last_target_locus.append(locus)
                                                 items_checked += 1
                                                 pos_iter_array.append(pos_iter)
@@ -372,7 +400,24 @@ class Coverage_parser(Transcript):
                             end_array.append(coverage_file.tell())
         return output
 
-    #def plottable_genomic_data(
-
+    #where binary_search_output is [[[infile locus, coverage]], [not in file locus]]
+    def plottable_genomic_data(self, binary_search_data, range_array, exome_identifier, gene_symbol):
+	filename = exome_identifier + '_' + gene_symbol + '.plottable.coverage'
+	with open(exome_identifier + '_' + gene_symbol + '_plottable_coverage.dat', 'w') as genomic_for_plotting:
+	    print binary_search_data[0]
+	    no_chrom_range_array = []
+	    count = -1
+	    in_file_loci = binary_search_data[0].keys()
+	    for chrom_locus in range_array:
+	        no_chrom_range_array.append(chrom_locus[1])
+	    for item in no_chrom_range_array:
+		if int(item) in in_file_loci:
+		    count += 1
+		    genomic_for_plotting.write(str(count) + ',' + str(binary_search_data[0][int(item)] + '\n'))
+		elif int(item) not in in_file_loci and int(item) in binary_search_data[1]:
+		    count += 1 
+		    genomic_for_plotting.write(str(count) + ',0' + '\n')
+	return str(filename)
+	    
 Argument_handler()
 	
