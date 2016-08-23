@@ -33,31 +33,19 @@ def binary_search_coverage(locus_array, coverage_file):
 	    while items_checked < this_item:
 	            this_begin = begin_array[-1]
 	            this_end = end_array[-1]
-		    #print 'begin = ' + str(this_begin) + ' end= ' + str(this_end)
 	            coverage_file.seek(((this_end + this_begin)/2),0)
 	            partial_line = coverage_file.readline()
 	            after_partial = coverage_file.tell()
 	            coverage_file.seek(after_partial)
 	            whole_line = coverage_file.readline()
 	            split_line = whole_line.split()
-		    #print split_line
 	            if ':' in split_line[0]:
 	                split_locus = split_line[0].split(':')
 	                chrom = int(item[0])
 	                target_chrom = int(split_locus[0])
-			#print 'target_chrom : ' + str(target_chrom)
         	        locus = int(item[1])
                 	target_locus = int(split_locus[1])
-			#print split_locus
 			if chrom == target_chrom:
-			    #print 'in file:'
-			    #print in_file
-			    print 'len in file = ' + str(len(in_file))
-			    print 'not in file:'
-			    #print not_in_file
-			    print 'len not in file = ' + str(len(not_in_file))
-			    #print 'found_chrom'
-			    #print chrom
 			    last_target_locus = [target_locus]
         	            chrom_end_array = [end_array[-1]]
 	                    chrom_begin_array = [begin_array[-1]]
@@ -66,7 +54,6 @@ def binary_search_coverage(locus_array, coverage_file):
 			    while locus != last_target_locus[-1]:
                                 coverage_file.seek(((chrom_end_array[-1] + chrom_begin_array[-1])/2),0)
 	                        partial_line2 = coverage_file.readline()
-				#print partial_line
 	                        end_partial2 = coverage_file.tell()
 	                        coverage_file.seek(end_partial2)
 	                        whole_line2 = coverage_file.readline()
@@ -74,16 +61,7 @@ def binary_search_coverage(locus_array, coverage_file):
         	                split_locus2 = split_line2[0].split(':')
                 	        target_chrom2 = int(split_locus2[0])
                         	target_locus2 = int(split_locus2[1])
-				#print split_line2
-				#print locus
 				if chrom == target_chrom2:
-				    #print
-				    #print 'chrom on target'
-				    #print len(in_file)
-				    #print chrom_begin_array
-				    #print chrom_end_array
-				    #print neg_iter
-				    #print pos_iter
 				    if locus == target_locus2:
 					in_file.append(locus)
 				        last_target_locus.append(target_locus2)
@@ -92,28 +70,17 @@ def binary_search_coverage(locus_array, coverage_file):
 					    neg_iter_array.append(neg_iter)
 					if pos_iter > 1:
 					    pos_iter_array.append(pos_iter)
-					print pos_iter_array
-					print neg_iter_array
 				    elif locus < target_locus2:
-					#print '    locus less'
 					chrom_end_array.append(coverage_file.tell())
 					if chrom_end_array[-1] == chrom_end_array[-2]:
-					    #print 'last two are equal'
 					    chrom_begin_array.append(chrom_begin_array[-1] - 1)
 					    neg_iter += 1
-					    #print 'in file:'
-                            		    #print in_file
-		                            #print 'len = ' + str(len(in_file))
-		                            #print 'not in file:'
-		                            #print not_in_file
-		                            #print 'len = ' + str(len(not_in_file))
 					    if neg_iter >= 200:
 					        not_in_file.append(locus)
 						last_target_locus.append(locus)
 						items_checked += 1
 						neg_iter_array.append(neg_iter)
 				    elif locus > target_locus2:
-					#print '    locus greater'
 					chrom_begin_array.append(coverage_file.tell())
 					if chrom_begin_array[-1] == chrom_begin_array[-2]:
 					    chrom_end_array.append(chrom_end_array[-1] + 1)
@@ -123,7 +90,6 @@ def binary_search_coverage(locus_array, coverage_file):
 						items_checked += 1
 						pos_iter_array.append(pos_iter)
 				elif chrom > target_chrom2:
-				    print 'chrom is greater'
 				    #move beginning to current_location	
 				    chrom_begin_array.append(coverage_file.tell())
 				    #reset the end to the one before it stars repeating
@@ -137,7 +103,6 @@ def binary_search_coverage(locus_array, coverage_file):
 				    else:
 					del chrom_end_array[-1]
 				elif chrom < target_chrom2:
-				    print 'chrom is less'
 				    #move end to current location
 				    chrom_end_array.append(coverage_file.tell())
 				    #reset the begining to before it starts repeating
@@ -160,5 +125,6 @@ def binary_search_coverage(locus_array, coverage_file):
 
 generate_transcript_range("transcript_intervals/NM_000352.3.intervals")
 search = binary_search_coverage(range_array, "/mnt/Data5/exome_sequencing/WE0343-WE0350/r01_metrics/Coverage")
-
-#print range_array[311:350]
+print len(in_file)
+print len(not_in_file)
+print not_in_file

@@ -28,9 +28,25 @@ class Argument_handler():
         if switch == 2:
 #	    call rest of program
 	    instance = Coverage_parser(self.arg_dict['sample_names'], self.arg_dict['gene_names'], '/mnt/Data1/resources/alamut-genes/grch37_2016-05-10.txt')
-            instance.exome_coverage_finder()
+            list_coverage_file_dicts = instance.exome_coverage_finder()
 	    instance.find_gene_intervals()
-	    instance.longest_transcript()
+	    longest_transcript_list = instance.longest_transcript()
+	    for item in longest_transcript_list:
+		output_name = instance.exon_interval_file_creator(item)
+		print output_name
+		sorted_file = instance.sorter(output_name)
+		print sorted_file
+		transcript_range = instance.generate_transcript_range(sorted_file)
+		print len(transcript_range)
+	        for item in list_coverage_file_dicts:
+		    for k,v in item.iteritems():
+			print v
+			#need to return the correct covergae metric from each line
+		        x = instance.binary_search_coverage(transcript_range, v, k)
+			for item in x:
+			    print item
+			print str(len(x[1])) + ' loci are not in the coverage_file'
+			#check binary search is in the range and write coverage data to plottable output.
 	    
 	else:	
 	    print 'ERROR - Input criteria not satisfied.'
@@ -51,6 +67,60 @@ class Transcript():
         self.gene_start = self.alamut_line[4]
         self.gene_stop = self.alamut_line[5]
         self.exons = {self.alamut_line[12] : [self.alamut_line[13], self.alamut_line[14]]}
+
+#split this into three funcitons
+    def generate_transcript_range(self, input_file):
+	extended = []
+	exons = []
+	range_array = []
+        with open(input_file, 'r') as input:
+            for line in input:
+                split_line = line.split(',')
+                ranger = (int(split_line[4]) - int(split_line[3])) + 1
+                extended.append(ranger)
+		exon = (int(split_line[2]) - int(split_line[1])) + 1
+		exons.append(exon)
+            	for i in range(int(split_line[3]), int(split_line[4]) + 1, 1):
+                    i = ['11', str(i)]
+                    range_array.append(i)
+	print exons
+	extended_intervals = input_file + '.extended'
+	with open(extended_intervals, 'w') as extended_interval_file:
+	    count1 = 0
+	    for item in extended:
+		extension = 0
+		exon_length = item - 100
+		end_of_exon = item - 50
+		for i in range(int(item)):
+		    count1 += 1
+		    extension += 1
+		    if extension <= 50:
+		        extended_interval_file.write(str(count1)+',-0.05\n')
+		    elif extension > 50 and extension <= end_of_exon:
+			extended_interval_file.write('\n')
+		    elif extension > end_of_exon:
+			extended_interval_file.write(str(count1)+',-0.05\n')
+	exon_file_name = input_file + '.exons'
+	with open(exon_file_name, 'w') as exon_interval_file:
+	    count2 = 0
+	    for item in extended:
+		extension2 = 0
+		exon_lengeth = item - 100
+		end_of_exon = item - 50
+		for i in range(int(item)):
+		    count2 += 1
+		    extension2 += 1
+		    if extension2 <= 50:
+		        exon_interval_file.write('\n')
+		    elif extension2 > 50 and extension2 <= end_of_exon:
+			exon_interval_file.write(str(count2)+',-0.05\n')
+		    elif extension2 > end_of_exon:
+		        exon_interval_file.write('\n')
+        return range_array
+
+#function to generate 
+#exons
+#extended
 
 class Coverage_parser(Transcript):
 
@@ -132,10 +202,9 @@ class Coverage_parser(Transcript):
 	current_longest = []
         #iterate through the gene list provided
         print 'identifying longest transcripts'
-        for gene in self.sample_list:
-            print gene
+        for gene in self.gene_list:
             this_gene = []
-            #current_longest = []
+            current_longest = []
             #iterate through the all transcript list of objects
             for item in self.transcript_instances:
                 if gene == item.__dict__['gene_symbol']:
@@ -155,7 +224,155 @@ class Coverage_parser(Transcript):
             print str(item.__dict__['gene_symbol']) + ' ' + str(item.__dict__['transcript_id']) + '\n'
         return longest_transcripts
 
+    def exon_interval_file_creator(self, transcript_instance):
+        print 'creating exon interval files'
+        output_name = transcript_instance.__dict__['transcript_id']
+        with open(output_name, 'w') as output_file:
+            exon_dictionary = transcript_instance.__dict__['exons']
+            for k,v in exon_dictionary.iteritems():
+                plus_50 = int(v[1]) + 50
+                minus_50 = int(v[0]) - 50
+                output = k + ',' + v[0] + ',' + v[1] + ',' + str(minus_50) + ',' + str(plus_50) + '\n'
+                print output
+                output_file.write(output)
+	return output_name
 
+    def sorter(self, file):
+	output = file +'.intervals'
+        with open(output, 'w') as sorted_file:
+            command = ["sort", "-V", file]
+            process = subprocess.Popen(command, stdout=subprocess.PIPE)
+            sorted_output = process.communicate()[0]
+            sorted_file.write(sorted_output)
+            #remove_command = ['rm', file]
+            #subprocess.call(remove_command)
+	return output
+
+    def match_sample_column_header(self, opened_coverage_file, exome_identifier):
+	y = 'Depth_for_' + exome_identifier
+	header_list = opened_coverage_file.readline().split()
+	for i,x in enumerate(header_list):
+	    if x == y:
+		result = [i,x]
+	return result	 
+
+    def binary_search_coverage(self, locus_array, coverage_file, exome_identifier):
+        in_file = []
+        not_in_file = []
+        pos_iter_array = []
+	neg_iter_array = []
+        output = [in_file, not_in_file]
+        with open(coverage_file, 'r') as coverage_file:
+	#extract_headerlist here to deduce column to extract coverage_data
+	    header_index = self.match_sample_column_header(coverage_file, exome_identifier)
+            items_checked = 0
+            this_item = 0
+            for item in locus_array:
+                this_item += 1
+                last_target_locus = []
+                end_array = []
+                begin_array = [0]
+                coverage_file.seek(0,2)
+                end_array.append(coverage_file.tell())
+                while items_checked < this_item:
+                    this_begin = begin_array[-1]
+                    this_end = end_array[-1]
+                    coverage_file.seek(((this_end + this_begin)/2),0)
+                    partial_line = coverage_file.readline()
+                    after_partial = coverage_file.tell()
+                    coverage_file.seek(after_partial)
+                    whole_line = coverage_file.readline()
+                    split_line = whole_line.split()
+                    if ':' in split_line[0]:
+                        split_locus = split_line[0].split(':')
+                        chrom = int(item[0])
+                        target_chrom = int(split_locus[0])
+                        locus = int(item[1])
+                        target_locus = int(split_locus[1])
+                        if chrom == target_chrom:
+                            last_target_locus = [target_locus]
+                            chrom_end_array = [end_array[-1]]
+                            chrom_begin_array = [begin_array[-1]]
+                            neg_iter = 0
+                            pos_iter = 0
+                            while locus != last_target_locus[-1]:
+                                coverage_file.seek(((chrom_end_array[-1] + chrom_begin_array[-1])/2),0)
+                                partial_line2 = coverage_file.readline()
+                                end_partial2 = coverage_file.tell()
+                                coverage_file.seek(end_partial2)
+                                whole_line2 = coverage_file.readline()
+                                split_line2 = whole_line2.split()
+                                split_locus2 = split_line2[0].split(':')
+                                target_chrom2 = int(split_locus2[0])
+                                target_locus2 = int(split_locus2[1])
+                                if chrom == target_chrom2:
+                                    if locus == target_locus2:
+					#extract coverage_data
+					coverage_data = split_line2[header_index[0]]
+					#print header_index[1]
+                                        in_file.append([locus, coverage_data])
+                                        last_target_locus.append(target_locus2)
+                                        items_checked += 1
+                                        if neg_iter > 1:
+                                            neg_iter_array.append(neg_iter)
+                                        if pos_iter > 1:
+                                            pos_iter_array.append(pos_iter)
+                                    elif locus < target_locus2:
+                                        chrom_end_array.append(coverage_file.tell())
+                                        if chrom_end_array[-1] == chrom_end_array[-2]:
+                                            chrom_begin_array.append(chrom_begin_array[-1] - 1)
+                                            neg_iter += 1
+                                            if neg_iter >= 200:
+                                                not_in_file.append(locus)
+                                                last_target_locus.append(locus)
+                                                items_checked += 1
+                                                neg_iter_array.append(neg_iter)
+                                    elif locus > target_locus2:
+                                        chrom_begin_array.append(coverage_file.tell())
+                                        if chrom_begin_array[-1] == chrom_begin_array[-2]:
+                                            chrom_end_array.append(chrom_end_array[-1] + 1)
+                                            if pos_inter >= 200:
+						#coverage_data == 0
+
+                                                not_in_file.append(locus)
+						last_target_locus.append(locus)
+                                                items_checked += 1
+                                                pos_iter_array.append(pos_iter)
+                                elif chrom > target_chrom2:
+                                    #move beginning to current_location
+                                    chrom_begin_array.append(coverage_file.tell())
+                                    #reset the end to the one before it stars repeating
+                                    if chrom_end_array[-2] == chrom_end_array[-1] - 1:
+                                        end_iter1 = 2
+                                        end_iter2 = 1
+                                        while chrom_end_array[-iter1] == chrom_end_array[-iter2] - 1:
+                                            end_iter1 += 1
+                                            end_iter2 += 2
+                                        chrom_end_array.append(end_iter1)
+                                    else:
+                                        del chrom_end_array[-1]
+                                elif chrom < target_chrom2:
+                                    #move end to current location
+                                    chrom_end_array.append(coverage_file.tell())
+                                    #reset the begining to before it starts repeating
+                                    if chrom_begin_array[-2] == chrom_begin_array[-1] - 1:
+                                        begin_iter1 = 2
+                                        begin_iter2 = 1
+                                        while chrom_beign_array[-iter1] == chrom_begin_array[-iter2] - 1:
+                                            begin_iter1 += 1
+                                            begin_iter2 += 2
+                                        chrom_begin_array.append(begin_iter1)
+                                    else:
+                                        del chrom_begin_array[-1]
+                        elif chrom > target_chrom:
+                            #move begining to current_location
+                            begin_array.append(coverage_file.tell())
+                        elif chrom <target_chrom:
+                            #move end to current_location
+                            end_array.append(coverage_file.tell())
+        return output
+
+    #def plottable_genomic_data(
 
 Argument_handler()
 	
