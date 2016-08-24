@@ -1,0 +1,10 @@
+#!/bin/bash
+
+for i in /mnt/Data5/exome_sequencing/*/control ; do
+    if grep -q $1 $i ; then
+	BASE_DIR=`echo $i | sed -e "s/\/control$//"`
+	COV_EXT='/r01_metrics/Coverage'
+        COV_FILE=$BASE_DIR$COV_EXT
+        echo $COV_FILE
+    fi
+done
