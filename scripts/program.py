@@ -1,57 +1,6 @@
 import argparse, os, subprocess, fnmatch, Gnuplot, Gnuplot.funcutils
 
-#initialises command line arguments and calls handler function that ensures all arguments have been passed
-class Argument_handler():
-    def __init__(self):
-        parser = argparse.ArgumentParser()
-	#parser.add_argument(alamut_file_path)
-        parser.add_argument('-s', action='store', dest='sample_names', help='path to file containing exome samples to be analysed')
-        parser.add_argument('-g', action='store', dest='gene_names', help='path to file containing the genes to be analysed')
-        arguments = parser.parse_args()
-        self.arg_dict = vars(arguments)
-        print 'initialised exome coverage parser with: ' + str(self.arg_dict)
-	self.handler()
-
-#handle if no sample path is given nonetype error
-    def handler(self):
-	switch = 0
-	if 'sample_names' in self.arg_dict.keys() and os.path.isfile(self.arg_dict['sample_names']):
-	    print 'samples file location confirmed. Ensure one sample per line.'
-	    switch += 1
-        elif not os.path.isfile(self.arg_dict['sample_names']):
-	    print 'Cannot find smaples file check path or ass -s flag before path'
-	if 'gene_names' in self.arg_dict.keys() and os.path.isfile(self.arg_dict['gene_names']):
-	    print 'genes file location confirmed. Ensure one sample per line.'
-	    switch += 1
-	elif not os.path.isfile(self.arg_dict['sample_names']):
-            print 'Cannot find smaples file check path or add -g flag before path'
-        if switch == 2:
-#	    call rest of program
-	    instance = Coverage_parser(self.arg_dict['sample_names'], self.arg_dict['gene_names'], '/mnt/Data1/resources/alamut-genes/grch37_2016-05-10.txt')
-            list_coverage_file_dicts = instance.exome_coverage_finder_bash()
-	    print 'finding gene intervals'
-	    instance.find_gene_intervals()
-	    longest_transcript_list = instance.longest_transcript()
-	    for item in longest_transcript_list:
-		output_name = instance.exon_interval_file_creator(item)
-		sorted_file = instance.sorter(output_name)
-		transcript_range = instance.generate_transcript_range(sorted_file, item)
-		print len(transcript_range)
-	        for sample_coverage_file in list_coverage_file_dicts:
-		    for k,v in sample_coverage_file.iteritems():
-			#need to return the correct covergae metric from each line
-		        binary_search_output = instance.binary_search_coverage(transcript_range, v, k)
-			x = instance.plottable_genomic_data(binary_search_output, transcript_range, k, item.gene_symbol)
-			extended = str(sorted_file) + '.extended'
-			exons = str(sorted_file) + '.exons'
-			gnuplot_instance = Gnuplotter(exons, extended, x, k, item.gene_symbol, '8878')
-		 	gnuplot_instance.coverage_plot()
-	    
-	else:	
-	    print 'ERROR - Input criteria not satisfied.'
-
 #Models a transcript using data from the Alamut genes file 
-
 class Gnuplotter():
     def __init__(self, interval_exons, interval_extended, plottable_coverage, exome_identifier, gene, length_of_extended_transcript):
         self.interval_exons = interval_exons
@@ -394,6 +343,69 @@ class Coverage_parser(Transcript):
 		    count += 1 
 		    genomic_for_plotting.write(str(count) + ',0' + '\n')
 	return str(filename)
-	    
-Argument_handler()
+
+
+class Argument_handler(Coverage_parser, Gnuplotter):
+    def __init__(self, s=None, sample_file=None, g=None, gene_file=None):
+	if s and sample_file:
+	    argument_list = [str(s), str(sample_file), str(g), str(gene_file)]
+	    print argument_list
+            this_parser = self.create_parser()
+            arguments, unknown = this_parser.parse_known_args(argument_list)
+	    print arguments
+	else:
+	    this_parser = self.create_parser()
+            arguments, unknown = this_parser.parse_known_args()
+        self.arg_dict = vars(arguments)
+        print 'initialised exome coverage parser with: ' + str(self.arg_dict)
+
+    def create_parser(self):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-s', action='store', dest='sample_names', help='path to file containing exome samples to be analysed')
+        parser.add_argument('-g', action='store', dest='gene_names', help='path to file containing the genes to be analysed')
+        return parser
+
+    #handle if no sample path is given nonetype error
+    def handler(self):
+        switch = 0
+        if 'sample_names' in self.arg_dict.keys() and os.path.isfile(self.arg_dict['sample_names']):
+            print 'samples file location confirmed. Ensure one sample per line.'
+            switch += 1
+        elif not os.path.isfile(self.arg_dict['sample_names']):
+            print 'Cannot find smaples file check path or ass -s flag before path'
+        if 'gene_names' in self.arg_dict.keys() and os.path.isfile(self.arg_dict['gene_names']):
+            print 'genes file location confirmed. Ensure one sample per line.'
+            switch += 1
+        elif not os.path.isfile(self.arg_dict['sample_names']):
+            print 'Cannot find smaples file check path or add -g flag before path'
+        if switch == 2:
+#           call rest of program
+            instance = Coverage_parser(self.arg_dict['sample_names'], self.arg_dict['gene_names'], '/mnt/Data1/resources/alamut-genes/grch37_2016-05-10.txt')
+            list_coverage_file_dicts = instance.exome_coverage_finder_bash()
+            print 'finding gene intervals'
+            instance.find_gene_intervals()
+            longest_transcript_list = instance.longest_transcript()
+            for item in longest_transcript_list:
+                output_name = instance.exon_interval_file_creator(item)
+                sorted_file = instance.sorter(output_name)
+                transcript_range = instance.generate_transcript_range(sorted_file, item)
+                print len(transcript_range)
+                for sample_coverage_file in list_coverage_file_dicts:
+                    for k,v in sample_coverage_file.iteritems():
+                        #need to return the correct covergae metric from each line
+                        binary_search_output = instance.binary_search_coverage(transcript_range, v, k)
+                        x = instance.plottable_genomic_data(binary_search_output, transcript_range, k, item.gene_symbol)
+                        extended = str(sorted_file) + '.extended'
+                        exons = str(sorted_file) + '.exons'
+                        gnuplot_instance = Gnuplotter(exons, extended, x, k, item.gene_symbol, '8878')
+                        gnuplot_instance.coverage_plot()
+
+        else:
+            print 'ERROR - Input criteria not satisfied.'
+
+
+if __name__ == '__main__':	    
+    print 'main'
+    A = Argument_handler()
+    A.handler()
 	
