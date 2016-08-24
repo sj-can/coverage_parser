@@ -28,7 +28,8 @@ class Argument_handler():
         if switch == 2:
 #	    call rest of program
 	    instance = Coverage_parser(self.arg_dict['sample_names'], self.arg_dict['gene_names'], '/mnt/Data1/resources/alamut-genes/grch37_2016-05-10.txt')
-            list_coverage_file_dicts = instance.exome_coverage_finder()
+            list_coverage_file_dicts = instance.exome_coverage_finder_bash()
+	    print 'finding gene intervals'
 	    instance.find_gene_intervals()
 	    longest_transcript_list = instance.longest_transcript()
 	    for item in longest_transcript_list:
@@ -64,7 +65,7 @@ class Gnuplotter():
 
     def coverage_plot(self):
 	g = Gnuplot.Gnuplot(debug=1)
-	g('set terminal svg size 5000, 500')
+	#g('set terminal svg size 5000, 500')
         file_name = str(self.gene) + '.svg'
 	output = 'set output ' + '"' + str(self.exome_identifier) + '_' + str(self.gene) + '.svg' + '"'
 	g(output)
@@ -79,7 +80,8 @@ class Gnuplotter():
 	g("set ytics ('0' f(0), '5' f(5), '10' f(10), '20' f(20), '40' f(40), '100' f(100), '200' f(200), '400' f(400), '800' f(800), '1600' f(1600))")
 	string_alternative = str(self.plottable_coverage)
 	print string_alternative
-	g('plot ' + '"' + string_alternative + '"' + ' using 1:(f($2)) with lines ls 3, ' + '-0.1 title ' + '"' + self.gene + '"' + ' with lines ls 3')
+	g('plot ' + '"' + string_alternative + '"' + ' using 1:(f($2)) with lines ls 3, ' + '-0.1 title ' + '"' + self.gene + '"' + ' with lines ls 3, ' + '0.2 title ' + '"' + '20x' + '"' + ' with lines ls 3' + ', "' + self.interval_exons + '"' + ' with lines ls 2' + ', "' + self.interval_extended + '"' + ' with lines ls 1')
+         
 # 0.2 title '20x' with lines ls 3, 0 title '' with lines ls 3, -0.1 title " + self.gene + " with lines ls 3, " + self.interval_exons + " with lines ls 2, " + self.interval_extended + " with lines ls 1")
         #plotting_funciton_string = '"' + string_alternative + '"' + ' with lines'
 	#g.plot(Gnuplot.File(string_alternative, with_='lines ls 3'))
@@ -174,36 +176,25 @@ class Coverage_parser(Transcript):
                 new_list.append(line)
         return new_list
 
-    def exome_coverage_finder(self):
+    def exome_coverage_finder_bash(self):
 	exome_coverage_files = []
-	print 'finding coverage files for : '
+        print 'finding coverage files for : '
         print (self.sample_list)
 	sample_iteration = 0
-	for exome_sample in self.sample_list:
-            print 'searching for ' + exome_sample + ' coverage file'
-	    match_count = 0
-            for root, directories, filenames in os.walk('/mnt/Data5/exome_sequencing/'):
-                for filename in filenames:
-                    match_pattern = '*' + exome_sample + '*'
-                    if fnmatch.fnmatch(str(filename), match_pattern) and match_count == 0:
-                        match_count += 1
-                        if len(self.exome_coverage_files) == sample_iteration:
-                            sample_iteration += 1
-                            if 'r01_metrics' in root:
-                                print '------match------'
-                                coverage_dict = {}
-                                coverage_dict[exome_sample] = root + '/Coverage'
-                                print coverage_dict
-                                exome_coverage_files.append(coverage_dict)
-                                print
-                            else:
-                                match_count -= 1
-                                sample_iteration -= 1
-			else:
-			    pass
-        print 'exome_coverage_files: ' + str(exome_coverage_files) + '\n'
+   	for exome_sample in self.sample_list:
+	    exome_sample = exome_sample.strip('\n')
+	    coverage_dict = {}
+	    command = ["bash", "all_exome_coverage_files", exome_sample]
+	    process = subprocess.Popen(command, stdout=subprocess.PIPE)
+	    cov_file_path = process.communicate()[0].strip('\n')
+	    #communicate output
+	    print cov_file_path
+	    coverage_dict[exome_sample] = cov_file_path
+            print coverage_dict
+            exome_coverage_files.append(coverage_dict)
         self.exome_coverage_files = exome_coverage_files
-	return exome_coverage_files
+	#print exome_coverage_files
+        return exome_coverage_files
 
     def find_gene_intervals(self):
         lines_parsed = 0
@@ -403,7 +394,7 @@ class Coverage_parser(Transcript):
     #where binary_search_output is [[[infile locus, coverage]], [not in file locus]]
     def plottable_genomic_data(self, binary_search_data, range_array, exome_identifier, gene_symbol):
 	filename = exome_identifier + '_' + gene_symbol + '.plottable.coverage'
-	with open(exome_identifier + '_' + gene_symbol + '_plottable_coverage.dat', 'w') as genomic_for_plotting:
+	with open(filename, 'w') as genomic_for_plotting:
 	    print binary_search_data[0]
 	    no_chrom_range_array = []
 	    count = -1
