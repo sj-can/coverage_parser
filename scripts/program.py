@@ -11,6 +11,7 @@ class Gnuplotter():
 	self.length_of_extended_transcript = length_of_extended_transcript
 
     def coverage_plot(self):
+        #plot 'test.dat' u 2:3:1 w labels point offset character 0,character 1 tc rgb "blue"
 	g = Gnuplot.Gnuplot(debug=1)
 	g('set terminal svg size 5000, 500')
         file_name = str(self.gene) + '.svg'
@@ -159,6 +160,7 @@ class Coverage_parser(Transcript):
 	current_longest = []
         #iterate through the gene list provided
         print 'identifying longest transcripts'
+
         for gene in self.gene_list:
             this_gene = []
             current_longest = []
@@ -182,7 +184,7 @@ class Coverage_parser(Transcript):
         return longest_transcripts
 
     def exon_interval_file_creator(self, transcript_instance):
-        print 'creating exon interval files'
+        print 'creating exon interval files : ' + transcript_instance.__dict__['transcript_id']
         output_name = transcript_instance.__dict__['transcript_id']
         with open(output_name, 'w') as output_file:
             exon_dictionary = transcript_instance.__dict__['exons']
@@ -194,6 +196,8 @@ class Coverage_parser(Transcript):
 	return output_name
 
     def sorter(self, file):
+	print 'sorting interval_file : ' + file
+	print
 	output = file +'.intervals'
         with open(output, 'w') as sorted_file:
             command = ["sort", "-V", file]
@@ -385,6 +389,7 @@ class Argument_handler(Coverage_parser, Gnuplotter):
             print 'finding gene intervals'
             instance.find_gene_intervals()
             longest_transcript_list = instance.longest_transcript()
+	    print longest_transcript_list
             for item in longest_transcript_list:
                 output_name = instance.exon_interval_file_creator(item)
                 sorted_file = instance.sorter(output_name)
