@@ -37,13 +37,14 @@ class Transcript():
         print 'gene_symbol = ' + self.gene_symbol
         self.transcript_id = self.alamut_line[7]
         print 'trans_id = ' + self.transcript_id
-        self.transcript_start = self.alamut_line[8]
-        self.transcript_end = self.alamut_line[9]
-        self.transcript_length = int(self.transcript_end) - int(self.transcript_start) + 1
+        self.cds_start = self.alamut_line[10]
+        self.cds_end = self.alamut_line[11]
+        self.cds_length = int(self.cds_end) - int(self.cds_start) + 1
         self.chromosome = self.alamut_line[3]
+	self.strand = self.alamut_line[6]
         self.gene_start = self.alamut_line[4]
         self.gene_stop = self.alamut_line[5]
-        self.exons = {self.alamut_line[12] : [self.alamut_line[13], self.alamut_line[14]]}
+        self.exons = {self.alamut_line[12] : [self.alamut_line[15], self.alamut_line[16]]}
 
 #split this into three funcitons
     def generate_transcript_range(self, input_file, transcript_instance):
@@ -103,6 +104,9 @@ class Coverage_parser(Transcript):
         self.sample_list = self.list_from_file(sample_name_file)
         self.gene_list = self.list_from_file(gene_name_file)
 	self.alamut_file = alamut_file
+	print self.sample_list
+	print self.gene_list
+	print self.alamut_file
 
     def line_strip_split(self, line):
         line = line.strip('\n')
@@ -137,45 +141,46 @@ class Coverage_parser(Transcript):
 
     def find_gene_intervals(self):
         lines_parsed = 0
-        print 'calculating exon intervals from alamut file \n'
         with open(self.alamut_file, 'r') as alamut_file:
             for line in alamut_file:
                 for gene in self.gene_list:
                     #if its the first line
                     if gene in line and len(self.transcript_instances) == 0:
                         line = line.split()
-                        initial_transcript_instance = Transcript(line)  
-			self.transcript_instances.append(initial_transcript_instance)
+			if gene == line[1] or gene == line[7]:
+                            initial_transcript_instance = Transcript(line)  
+			    self.transcript_instances.append(initial_transcript_instance)
 		    elif gene in line and len(self.transcript_instances) > 0:
 		        line = line.split()
- 			if self.transcript_instances[-1].transcript_id == line[7] and line [12] not in self.transcript_instances[-1].exons:
-			    self.transcript_instances[-1].exons[line[12]] = [line[13], line [14]]
-			if self.transcript_instances[-1].transcript_id != line[7]:
-			    additional_transcript_instance = Transcript(line)
-			    self.transcript_instances.append(additional_transcript_instance)
+			#if gene is symbol or transcript
+			if gene == line[1] or gene == line[7]:
+			    if self.transcript_instances[-1].transcript_id == line[7] and line [12] not in self.transcript_instances[-1].exons:
+			        self.transcript_instances[-1].exons[line[12]] = [line[15], line [16]]
+			    if self.transcript_instances[-1].transcript_id != line[7]:
+			        additional_transcript_instance = Transcript(line)
+			        self.transcript_instances.append(additional_transcript_instance)
 
-#need to account for it they are equal
+    #need to account for it they are equal
     def longest_transcript(self):
         longest_transcripts = []
 	current_longest = []
         #iterate through the gene list provided
         print 'identifying longest transcripts'
-
         for gene in self.gene_list:
             this_gene = []
             current_longest = []
             #iterate through the all transcript list of objects
             for item in self.transcript_instances:
-                if gene == item.__dict__['gene_symbol']:
+                if gene == item.__dict__['gene_symbol'] or gene == item.__dict__['transcript_id']:
                     if len(current_longest) == 0:
                         this_gene.append(item)
                         current_longest.append(item)
                     elif len(current_longest) == 1:
                         this_gene.append(item)
             for item in this_gene:
-                current = current_longest[-1].__dict__['transcript_length']
-                challenger = item.__dict__['transcript_length']
-                if int(challenger) >= int(current):
+	        current = int(current_longest[-1].__dict__['cds_length'])
+                challenger = int(item.__dict__['cds_length'])
+                if challenger > current:
                     current_longest[-1] = item
             longest_transcripts.append(current_longest[-1])
         print 'the longest transcripts are:'
@@ -185,15 +190,16 @@ class Coverage_parser(Transcript):
 
     def exon_interval_file_creator(self, transcript_instance):
         print 'creating exon interval files : ' + transcript_instance.__dict__['transcript_id']
-        output_name = transcript_instance.__dict__['transcript_id']
-        with open(output_name, 'w') as output_file:
+	output = transcript_instance.__dict__['transcript_id']
+        with open(output, 'w') as output_file:
             exon_dictionary = transcript_instance.__dict__['exons']
             for k,v in exon_dictionary.iteritems():
-                plus_50 = int(v[1]) + 50
-                minus_50 = int(v[0]) - 50
-                output = k + ',' + v[0] + ',' + v[1] + ',' + str(minus_50) + ',' + str(plus_50) + '\n'
-                output_file.write(output)
-	return output_name
+		if int(v[0]) or int(v[1]) != 0:
+                    plus_50 = int(v[1]) + 50
+                    minus_50 = int(v[0]) - 50
+                    output = k + ',' + v[0] + ',' + v[1] + ',' + str(minus_50) + ',' + str(plus_50) + '\n'
+                    output_file.write(output)
+	return output
 
     def sorter(self, file):
 	print 'sorting interval_file : ' + file
@@ -384,26 +390,24 @@ class Argument_handler(Coverage_parser, Gnuplotter):
             print 'Cannot find smaples file check path or add -g flag before path'
         if switch == 2:
 #           call rest of program
-            instance = Coverage_parser(self.arg_dict['sample_names'], self.arg_dict['gene_names'], '/mnt/Data1/resources/alamut-genes/grch37_2016-05-10.txt')
+            instance = Coverage_parser(self.arg_dict['sample_names'], self.arg_dict['gene_names'], '/mnt/Data1/resources/alamut-genes/grch37.txt')
             list_coverage_file_dicts = instance.exome_coverage_finder_bash()
-            print 'finding gene intervals'
             instance.find_gene_intervals()
             longest_transcript_list = instance.longest_transcript()
-	    print longest_transcript_list
             for item in longest_transcript_list:
                 output_name = instance.exon_interval_file_creator(item)
-                sorted_file = instance.sorter(output_name)
-                transcript_range = instance.generate_transcript_range(sorted_file, item)
-                print len(transcript_range)
-                for sample_coverage_file in list_coverage_file_dicts:
-                    for k,v in sample_coverage_file.iteritems():
-                        #need to return the correct covergae metric from each line
-                        binary_search_output = instance.binary_search_coverage(transcript_range, v, k)
-                        x = instance.plottable_genomic_data(binary_search_output, transcript_range, k, item.gene_symbol)
-                        extended = str(sorted_file) + '.extended'
-                        exons = str(sorted_file) + '.exons'
-                        gnuplot_instance = Gnuplotter(exons, extended, x, k, item.gene_symbol, '8878')
-                        gnuplot_instance.coverage_plot()
+  #              sorted_file = instance.sorter(output_name)
+   #             transcript_range = instance.generate_transcript_range(sorted_file, item)
+    #            print len(transcript_range)
+     #           for sample_coverage_file in list_coverage_file_dicts:
+      #              for k,v in sample_coverage_file.iteritems():
+       #                 #need to return the correct covergae metric from each line
+        #                binary_search_output = instance.binary_search_coverage(transcript_range, v, k)
+         #               x = instance.plottable_genomic_data(binary_search_output, transcript_range, k, item.gene_symbol)
+          #              extended = str(sorted_file) + '.extended'
+           #             exons = str(sorted_file) + '.exons'
+            #            gnuplot_instance = Gnuplotter(exons, extended, x, k, item.gene_symbol, '8878')
+             #           gnuplot_instance.coverage_plot()
 
         else:
             print 'ERROR - Input criteria not satisfied.'
