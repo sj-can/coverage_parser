@@ -55,11 +55,14 @@ class Transcript():
             for line in input:
                 split_line = line.split(',')
                 ranger = (int(split_line[4]) - int(split_line[3])) + 1
+		print split_line[0]
+		print ranger
                 extended.append(ranger)
 		exon = (int(split_line[2]) - int(split_line[1])) + 1
+		print exon
 		exons.append(exon)
             	for i in range(int(split_line[3]), int(split_line[4]) + 1, 1):
-                    i = [str(transcript_instance.chromosome), str(i)]
+                    i = [str(transcript_instance.chromosome), str(i), split_line[0]]
                     range_array.append(i)
 	extended_intervals = input_file + '.extended'
 	with open(extended_intervals, 'w') as extended_interval_file:
@@ -93,7 +96,10 @@ class Transcript():
 			exon_interval_file.write(str(count2)+',-0.05\n')
 		    elif extension2 > end_of_exon:
 		        exon_interval_file.write('\n')
+#	for item in range_array:
+#	    print item
         return range_array
+
 
 class Coverage_parser(Transcript):
 
@@ -190,28 +196,38 @@ class Coverage_parser(Transcript):
 
     def exon_interval_file_creator(self, transcript_instance):
         print 'creating exon interval files : ' + transcript_instance.__dict__['transcript_id']
-	output = transcript_instance.__dict__['transcript_id']
-        with open(output, 'w') as output_file:
-            exon_dictionary = transcript_instance.__dict__['exons']
-            for k,v in exon_dictionary.iteritems():
-		if int(v[0]) or int(v[1]) != 0:
-                    plus_50 = int(v[1]) + 50
-                    minus_50 = int(v[0]) - 50
-                    output = k + ',' + v[0] + ',' + v[1] + ',' + str(minus_50) + ',' + str(plus_50) + '\n'
-                    output_file.write(output)
-	return output
+	if transcript_instance.__dict__['strand'] == '-1':
+	    output_name = transcript_instance.__dict__['transcript_id'] + '_reverse'
+            with open(output_name, 'w') as output_file:
+                exon_dictionary = transcript_instance.__dict__['exons']
+                for k,v in exon_dictionary.iteritems():
+		    if int(v[0]) or int(v[1]) != 0:
+                        plus_50 = int(v[1]) + 50
+                        minus_50 = int(v[0]) - 50
+                        output = k + ',' + v[0] + ',' + v[1] + ',' + str(minus_50) + ',' + str(plus_50) + '\n'
+                        output_file.write(output)
+	return output_name
 
     def sorter(self, file):
 	print 'sorting interval_file : ' + file
 	print
-	output = file +'.intervals'
-        with open(output, 'w') as sorted_file:
-            command = ["sort", "-V", file]
-            process = subprocess.Popen(command, stdout=subprocess.PIPE)
-            sorted_output = process.communicate()[0]
-            sorted_file.write(sorted_output)
+	if 'reverse' in file:
+	    print file
+	    output = file +'.intervals'
+	    with open(output, 'w') as sorted_file:
+		command = ["sort", "-r", "-V", file]
+		process = subprocess.Popen(command, stdout=subprocess.PIPE)
+		sorted_output = process.communicate()[0]
+		sorted_file.write(sorted_output)
+	else:
+            with open(output, 'w') as sorted_file:
+                command = ["sort", "-V", file]
+                process = subprocess.Popen(command, stdout=subprocess.PIPE)
+                sorted_output = process.communicate()[0]
+                sorted_file.write(sorted_output)
             #remove_command = ['rm', file]
             #subprocess.call(remove_command)
+	 
 	return output
 
     def match_sample_column_header(self, opened_coverage_file, exome_identifier):
@@ -223,6 +239,7 @@ class Coverage_parser(Transcript):
 	return result	 
 
     def binary_search_coverage(self, locus_array, coverage_file, exome_identifier):
+
         in_file = {}
         not_in_file = []
         pos_iter_array = []
@@ -336,9 +353,9 @@ class Coverage_parser(Transcript):
                             end_array.append(coverage_file.tell())
         return output
 
-    #where binary_search_output is [[[infile locus, coverage]], [not in file locus]]
-    def plottable_genomic_data(self, binary_search_data, range_array, exome_identifier, gene_symbol):
-	filename = exome_identifier + '_' + gene_symbol + '.plottable.coverage'
+    #where binary_search_output is [{infile locus : coverage} , [not in file locus]]
+    def plottable_genomic_data(self, binary_search_data, range_array, exome_identifier, transcript_instance):
+	filename = exome_identifier + '_' + transcript_instance.gene_symbol + '.plottable.coverage'
 	with open(filename, 'w') as genomic_for_plotting:
 	    no_chrom_range_array = []
 	    count = -1
@@ -396,18 +413,18 @@ class Argument_handler(Coverage_parser, Gnuplotter):
             longest_transcript_list = instance.longest_transcript()
             for item in longest_transcript_list:
                 output_name = instance.exon_interval_file_creator(item)
-  #              sorted_file = instance.sorter(output_name)
-   #             transcript_range = instance.generate_transcript_range(sorted_file, item)
-    #            print len(transcript_range)
-     #           for sample_coverage_file in list_coverage_file_dicts:
-      #              for k,v in sample_coverage_file.iteritems():
-       #                 #need to return the correct covergae metric from each line
-        #                binary_search_output = instance.binary_search_coverage(transcript_range, v, k)
-         #               x = instance.plottable_genomic_data(binary_search_output, transcript_range, k, item.gene_symbol)
-          #              extended = str(sorted_file) + '.extended'
-           #             exons = str(sorted_file) + '.exons'
-            #            gnuplot_instance = Gnuplotter(exons, extended, x, k, item.gene_symbol, '8878')
-             #           gnuplot_instance.coverage_plot()
+                sorted_file = instance.sorter(output_name)
+                transcript_range = instance.generate_transcript_range(sorted_file, item)
+                for sample_coverage_file in list_coverage_file_dicts:
+		    print sample_coverage_file
+                    for k,v in sample_coverage_file.iteritems():
+                        binary_search_output = instance.binary_search_coverage(transcript_range, v, k)
+                        x = instance.plottable_genomic_data(binary_search_output, transcript_range, k, item)
+                        extended = str(sorted_file) + '.extended'
+			print len(transcript_range)
+                        exons = str(sorted_file) + '.exons'
+                        #gnuplot_instance = Gnuplotter(exons, extended, x, k, item.gene_symbol, '8878')
+                        #gnuplot_instance.coverage_plot()
 
         else:
             print 'ERROR - Input criteria not satisfied.'
