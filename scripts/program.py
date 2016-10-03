@@ -55,11 +55,8 @@ class Transcript():
             for line in input:
                 split_line = line.split(',')
                 ranger = (int(split_line[4]) - int(split_line[3])) + 1
-		print split_line[0]
-		print ranger
                 extended.append(ranger)
 		exon = (int(split_line[2]) - int(split_line[1])) + 1
-		print exon
 		exons.append(exon)
             	for i in range(int(split_line[3]), int(split_line[4]) + 1, 1):
                     i = [str(transcript_instance.chromosome), str(i), split_line[0]]
@@ -96,8 +93,6 @@ class Transcript():
 			exon_interval_file.write(str(count2)+',-0.05\n')
 		    elif extension2 > end_of_exon:
 		        exon_interval_file.write('\n')
-#	for item in range_array:
-#	    print item
         return range_array
 
 
@@ -110,9 +105,6 @@ class Coverage_parser(Transcript):
         self.sample_list = self.list_from_file(sample_name_file)
         self.gene_list = self.list_from_file(gene_name_file)
 	self.alamut_file = alamut_file
-	print self.sample_list
-	print self.gene_list
-	print self.alamut_file
 
     def line_strip_split(self, line):
         line = line.strip('\n')
@@ -142,7 +134,6 @@ class Coverage_parser(Transcript):
 	    coverage_dict[exome_sample] = cov_file_path
             exome_coverage_files.append(coverage_dict)
         self.exome_coverage_files = exome_coverage_files
-	print exome_coverage_files
         return exome_coverage_files
 
     def find_gene_intervals(self):
@@ -198,33 +189,29 @@ class Coverage_parser(Transcript):
         print 'creating exon interval files : ' + transcript_instance.__dict__['transcript_id']
 	if transcript_instance.__dict__['strand'] == '-1':
 	    output_name = transcript_instance.__dict__['transcript_id'] + '_reverse'
-            with open(output_name, 'w') as output_file:
-                exon_dictionary = transcript_instance.__dict__['exons']
-                for k,v in exon_dictionary.iteritems():
-		    if int(v[0]) or int(v[1]) != 0:
-                        plus_50 = int(v[1]) + 50
-                        minus_50 = int(v[0]) - 50
-                        output = k + ',' + v[0] + ',' + v[1] + ',' + str(minus_50) + ',' + str(plus_50) + '\n'
-                        output_file.write(output)
+	elif transcript_instance.__dict__['strand'] == '1':
+	    output_name = transcript_instance.__dict__['transcript_id']
+        with open(output_name, 'w') as output_file:
+            exon_dictionary = transcript_instance.__dict__['exons']
+            for k,v in exon_dictionary.iteritems():
+	        if int(v[0]) or int(v[1]) != 0:
+                    plus_50 = int(v[1]) + 50
+                    minus_50 = int(v[0]) - 50
+                    output = k + ',' + v[0] + ',' + v[1] + ',' + str(minus_50) + ',' + str(plus_50) + '\n'
+                    output_file.write(output)
 	return output_name
 
     def sorter(self, file):
 	print 'sorting interval_file : ' + file
-	print
 	if 'reverse' in file:
-	    print file
-	    output = file +'.intervals'
-	    with open(output, 'w') as sorted_file:
-		command = ["sort", "-r", "-V", file]
-		process = subprocess.Popen(command, stdout=subprocess.PIPE)
-		sorted_output = process.communicate()[0]
-		sorted_file.write(sorted_output)
+	    command = ["sort", "-r", "-V", file]
 	else:
-            with open(output, 'w') as sorted_file:
-                command = ["sort", "-V", file]
-                process = subprocess.Popen(command, stdout=subprocess.PIPE)
-                sorted_output = process.communicate()[0]
-                sorted_file.write(sorted_output)
+	    command = ["sort", "-V", file]
+	output = file +'.intervals'
+	with open(output, 'w') as sorted_file:
+	    process = subprocess.Popen(command, stdout=subprocess.PIPE)
+	    sorted_output = process.communicate()[0]
+	    sorted_file.write(sorted_output)
             #remove_command = ['rm', file]
             #subprocess.call(remove_command)
 	 
@@ -239,7 +226,6 @@ class Coverage_parser(Transcript):
 	return result	 
 
     def binary_search_coverage(self, locus_array, coverage_file, exome_identifier):
-
         in_file = {}
         not_in_file = []
         pos_iter_array = []
@@ -251,6 +237,7 @@ class Coverage_parser(Transcript):
             items_checked = 0
             this_item = 0
             for item in locus_array:
+		print item
                 this_item += 1
                 last_target_locus = []
                 end_array = []
@@ -265,15 +252,20 @@ class Coverage_parser(Transcript):
                     after_partial = coverage_file.tell()
                     coverage_file.seek(after_partial)
                     whole_line = coverage_file.readline()
+		    print whole_line
                     split_line = whole_line.split()
                     if ':' in split_line[0]:
+			print whole_line
                         split_locus = split_line[0].split(':')
                         chrom = int(item[0])
                         target_chrom = int(split_locus[0])
                         locus = int(item[1])
                         target_locus = int(split_locus[1])
                         if chrom == target_chrom:
+			    print whole_line
                             last_target_locus = [target_locus]
+			    print last_target_locus
+			    print locus
                             chrom_end_array = [end_array[-1]]
                             chrom_begin_array = [begin_array[-1]]
                             neg_iter = 0
@@ -288,6 +280,7 @@ class Coverage_parser(Transcript):
                                 split_locus2 = split_line2[0].split(':')
                                 target_chrom2 = int(split_locus2[0])
                                 target_locus2 = int(split_locus2[1])
+				print target_chrom2
                                 if chrom == target_chrom2:
                                     if locus == target_locus2:
 					#extract coverage_data
@@ -322,8 +315,9 @@ class Coverage_parser(Transcript):
                                 elif chrom > target_chrom2:
                                     #move beginning to current_location
                                     chrom_begin_array.append(coverage_file.tell())
-                                    #reset the end to the one before it stars repeating
+                                    #reset the end to the one before it starts repeating
                                     if chrom_end_array[-2] == chrom_end_array[-1] - 1:
+					print '> resetting'
                                         end_iter1 = 2
                                         end_iter2 = 1
                                         while chrom_end_array[-iter1] == chrom_end_array[-iter2] - 1:
@@ -331,12 +325,15 @@ class Coverage_parser(Transcript):
                                             end_iter2 += 2
                                         chrom_end_array.append(end_iter1)
                                     else:
+					print '> deleting'
+					print chrom_end_array[-1]
                                         del chrom_end_array[-1]
                                 elif chrom < target_chrom2:
                                     #move end to current location
                                     chrom_end_array.append(coverage_file.tell())
                                     #reset the begining to before it starts repeating
                                     if chrom_begin_array[-2] == chrom_begin_array[-1] - 1:
+					print '< resetting'
                                         begin_iter1 = 2
                                         begin_iter2 = 1
                                         while chrom_beign_array[-iter1] == chrom_begin_array[-iter2] - 1:
@@ -344,11 +341,13 @@ class Coverage_parser(Transcript):
                                             begin_iter2 += 2
                                         chrom_begin_array.append(begin_iter1)
                                     else:
+					print '< deleting'
+					print chrom_begin_array[-1]
                                         del chrom_begin_array[-1]
                         elif chrom > target_chrom:
                             #move begining to current_location
                             begin_array.append(coverage_file.tell())
-                        elif chrom <target_chrom:
+                        elif chrom < target_chrom:
                             #move end to current_location
                             end_array.append(coverage_file.tell())
         return output
@@ -376,10 +375,8 @@ class Argument_handler(Coverage_parser, Gnuplotter):
     def __init__(self, s=None, sample_file=None, g=None, gene_file=None):
 	if s and sample_file:
 	    argument_list = [str(s), str(sample_file), str(g), str(gene_file)]
-	    print argument_list
             this_parser = self.create_parser()
             arguments, unknown = this_parser.parse_known_args(argument_list)
-	    print arguments
 	else:
 	    this_parser = self.create_parser()
             arguments, unknown = this_parser.parse_known_args()
@@ -416,15 +413,17 @@ class Argument_handler(Coverage_parser, Gnuplotter):
                 sorted_file = instance.sorter(output_name)
                 transcript_range = instance.generate_transcript_range(sorted_file, item)
                 for sample_coverage_file in list_coverage_file_dicts:
-		    print sample_coverage_file
                     for k,v in sample_coverage_file.iteritems():
+			print k,v 
+			print 'starting binary search'
                         binary_search_output = instance.binary_search_coverage(transcript_range, v, k)
+			print 'generating plottable data'
                         x = instance.plottable_genomic_data(binary_search_output, transcript_range, k, item)
                         extended = str(sorted_file) + '.extended'
 			print len(transcript_range)
                         exons = str(sorted_file) + '.exons'
-                        #gnuplot_instance = Gnuplotter(exons, extended, x, k, item.gene_symbol, '8878')
-                        #gnuplot_instance.coverage_plot()
+                        gnuplot_instance = Gnuplotter(exons, extended, x, k, item.gene_symbol, str(len(transcript_range)))
+                        gnuplot_instance.coverage_plot()
 
         else:
             print 'ERROR - Input criteria not satisfied.'
