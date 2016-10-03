@@ -376,7 +376,7 @@ class Argument_handler(Coverage_parser, Gnuplotter):
             print 'samples file location confirmed. Ensure one sample per line.'
             switch += 1
         elif not os.path.isfile(self.arg_dict['sample_names']):
-            print 'Cannot find smaples file check path or ass -s flag before path'
+            print 'Cannot find samples file check path or add -s flag before path'
         if 'gene_names' in self.arg_dict.keys() and os.path.isfile(self.arg_dict['gene_names']):
             print 'genes file location confirmed. Ensure one sample per line.'
             switch += 1
