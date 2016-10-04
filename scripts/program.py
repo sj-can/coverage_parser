@@ -225,6 +225,127 @@ class Coverage_parser(Transcript):
 		result = [i,x]
 	return result	 
 
+    def line_search_and_split(self, file, current_start, current_end):
+        seek_pointer = file.seek(((current_end + current_start)/2),0)
+	print 'SEEKER ' + str(file.tell())
+        partial_line = file.readline()
+        whole_line = file.readline()
+        split_line = whole_line.split()
+        return split_line
+
+
+    def bin_search(self, locus_array, coverage_file, exome_identifier):
+        in_file = {}
+        not_in_file = []
+        pos_iter_array = []
+        neg_iter_array = []
+	#locus_array = [['16', '86544126']]
+	output = [in_file, not_in_file]
+        with open(coverage_file, 'r') as coverage_file:
+	    header_index = self.match_sample_column_header(coverage_file, exome_identifier)
+	    items_checked = 0
+	    this_item = 0
+	    desired = 1
+	    for item in locus_array:
+	        this_item += 1
+	 	last_target_locus = []
+		end_array = []
+		begin_array = [0]
+		seek_end = coverage_file.seek(0,2)
+		end_array.append(coverage_file.tell())
+		while items_checked < this_item:
+		    this_begin = begin_array[-1]
+		    this_end = end_array[-1]
+		    next_line = self.line_search_and_split(coverage_file, this_begin, this_end)
+		    print next_line
+		    #perhaps include number of characters in chromosome to avoid match between e.g. 6: and 16:
+		    if ':' in next_line[0]:
+			print
+			print next_line[0]
+			split_locus = split_locus = next_line[0].split(':')
+			chrom = int(item[0])
+			locus = int(item[1])
+			target_chrom = int(split_locus[0])
+		        target_locus = int(split_locus[1])
+			#print 'chrom: ' + str(chrom) 
+			#print 'locus: ' + str(locus)
+			#print 'target_chrom: ' + str(target_chrom)	
+			#print 'target_locus: ' + str(target_locus)
+			#print 'current_begin ' + str(this_begin)
+			#print 'current_end ' + str(this_end)
+			#print 'current_pointer_location ' + str(coverage_file.tell())
+			#print
+			if chrom > target_chrom:
+			    print
+			    print 'chrom greater, move start to current'
+			    begin_array.append(coverage_file.tell())
+			elif chrom < target_chrom:
+			    print
+			    print 'chrom less, move end to current'
+			    end_array.append(coverage_file.tell())
+			elif chrom == target_chrom:
+			    print
+			    print 'FOUND TARGET CHROMOSOME'
+			    last_target_locus = [target_locus]
+			    #print 'last_target_locus ' + str(last_target_locus[-1])
+			    chrom_begin_array = [begin_array[-1]]
+			    #print 'cba ' + str(chrom_begin_array)
+			    chrom_end_array = [end_array[-1]]
+			    #print 'cea ' + str(chrom_end_array)
+			    items_checked += 1
+			    while locus != last_target_locus[-1]:
+				print
+				print 'TARGET LOCUS NOT A MATCH'
+				new_next_line = self.line_search_and_split(coverage_file, chrom_begin_array[-1], chrom_end_array[-1])
+				new_target = new_next_line[0].split(':')
+				new_target_chrom = int(new_target[0])
+				new_target_locus = int(new_target[1])
+				#print 'desired locus ' + str(item)
+				#print 'new line ' + str(new_next_line)
+				#print 'new_target ' + str(new_target)
+				#print 'current_coords ' + str(chrom_begin_array) + ' ' + str(chrom_end_array)
+				#print 'new_target_chrom ' + str(new_target_chrom)
+				#print 'new_target_locus ' + str(new_target_locus)
+				#print 'updating intervals to search for locus'
+				#print 'current pointer ' + str(coverage_file.tell())
+				#check chromosome is still the same
+				if chrom < new_target_chrom:
+				    print
+				    print 'THIS CHROMOSOME NOW GREATER THAN DESIRED'
+				    #move the end to the current location
+				    chrom_end_array.append(coverage_file.tell())
+				if chrom > new_target_chrom:
+				    print
+				    print 'THIS CHROMOSOME NOW LESS THAN DESIRED'
+				    #move the start to current location
+				    chrom_begin_array.append(coverage_file.tell())
+				if chrom == new_target_chrom:
+				    print
+				    print 'CHROMOSOME STILL MATCHES'
+				    if locus > new_target_locus:
+					print 'THIS LOCUS NOW LESS THAN DESIRED'
+					chrom_begin_array.append(coverage_file.tell())
+					if chrom_begin_array[-1] == chrom_begin_array[-2]:
+					    print 'END OFFSET REQUIRED'
+					    chrom_end_array.append(chrom_end_array[-1] - 10)
+				    elif locus < new_target_locus:
+					print
+					print 'THIS LOCUS NOW GREATER THAN DESIRED'
+					chrom_end_array.append(coverage_file.tell())
+					if chrom_end_array[-1] == chrom_end_array[-2]:
+					    #need to create an offset
+					    print 'BEGIN OFFSET REQUIRED'
+					    chrom_begin_array.append(chrom_begin_array[-1] - 10)
+				    elif locus == new_target_locus:
+					print
+					print 'MATCH'
+					coverage_data = new_next_line[header_index[0]]
+					in_file[locus] = coverage_data
+					last_target_locus.append(new_target_locus)
+					items_checked += 1 
+	return output
+
+
     def binary_search_coverage(self, locus_array, coverage_file, exome_identifier):
         in_file = {}
         not_in_file = []
@@ -416,8 +537,10 @@ class Argument_handler(Coverage_parser, Gnuplotter):
                     for k,v in sample_coverage_file.iteritems():
 			print k,v 
 			print 'starting binary search'
-                        binary_search_output = instance.binary_search_coverage(transcript_range, v, k)
+                        #binary_search_output = instance.binary_search_coverage(transcript_range, v, k)
+			binary_search_output = instance.bin_search(transcript_range, v, k)
 			print 'generating plottable data'
+			print len(binary_search_output[0])
                         x = instance.plottable_genomic_data(binary_search_output, transcript_range, k, item)
                         extended = str(sorted_file) + '.extended'
 			print len(transcript_range)
