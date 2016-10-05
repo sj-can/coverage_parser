@@ -227,19 +227,20 @@ class Coverage_parser(Transcript):
 
     def line_search_and_split(self, file, current_start, current_end):
         seek_pointer = file.seek(((current_end + current_start)/2),0)
-	print 'SEEKER ' + str(file.tell())
+	#print 'SEEKER ' + str(file.tell())
         partial_line = file.readline()
         whole_line = file.readline()
         split_line = whole_line.split()
         return split_line
 
 
+    #need to accoount for x/y chromosomes 
+    #need to account for if the data is not present (perhaps 20 iterations?)
     def bin_search(self, locus_array, coverage_file, exome_identifier):
         in_file = {}
         not_in_file = []
         pos_iter_array = []
         neg_iter_array = []
-	#locus_array = [['16', '86544126']]
 	output = [in_file, not_in_file]
         with open(coverage_file, 'r') as coverage_file:
 	    header_index = self.match_sample_column_header(coverage_file, exome_identifier)
@@ -292,10 +293,10 @@ class Coverage_parser(Transcript):
 			    #print 'cba ' + str(chrom_begin_array)
 			    chrom_end_array = [end_array[-1]]
 			    #print 'cea ' + str(chrom_end_array)
-			    items_checked += 1
+			    #items_checked += 1
 			    while locus != last_target_locus[-1]:
-				print
-				print 'TARGET LOCUS NOT A MATCH'
+				#print
+				#print 'TARGET LOCUS NOT A MATCH'
 				new_next_line = self.line_search_and_split(coverage_file, chrom_begin_array[-1], chrom_end_array[-1])
 				new_target = new_next_line[0].split(':')
 				new_target_chrom = int(new_target[0])
@@ -310,37 +311,39 @@ class Coverage_parser(Transcript):
 				#print 'current pointer ' + str(coverage_file.tell())
 				#check chromosome is still the same
 				if chrom < new_target_chrom:
-				    print
-				    print 'THIS CHROMOSOME NOW GREATER THAN DESIRED'
+				    #print
+				    #print 'THIS CHROMOSOME NOW GREATER THAN DESIRED'
 				    #move the end to the current location
 				    chrom_end_array.append(coverage_file.tell())
 				if chrom > new_target_chrom:
-				    print
-				    print 'THIS CHROMOSOME NOW LESS THAN DESIRED'
+				    #print
+				    #print 'THIS CHROMOSOME NOW LESS THAN DESIRED'
 				    #move the start to current location
 				    chrom_begin_array.append(coverage_file.tell())
 				if chrom == new_target_chrom:
-				    print
-				    print 'CHROMOSOME STILL MATCHES'
+				    #print
+				    #print 'CHROMOSOME STILL MATCHES'
 				    if locus > new_target_locus:
-					print 'THIS LOCUS NOW LESS THAN DESIRED'
+					#print 'THIS LOCUS NOW LESS THAN DESIRED'
 					chrom_begin_array.append(coverage_file.tell())
 					if chrom_begin_array[-1] == chrom_begin_array[-2]:
-					    print 'END OFFSET REQUIRED'
+					    #print 'END OFFSET REQUIRED'
 					    chrom_end_array.append(chrom_end_array[-1] - 10)
 				    elif locus < new_target_locus:
-					print
-					print 'THIS LOCUS NOW GREATER THAN DESIRED'
+					#print
+					#print 'THIS LOCUS NOW GREATER THAN DESIRED'
 					chrom_end_array.append(coverage_file.tell())
 					if chrom_end_array[-1] == chrom_end_array[-2]:
 					    #need to create an offset
-					    print 'BEGIN OFFSET REQUIRED'
+					    #print 'BEGIN OFFSET REQUIRED'
 					    chrom_begin_array.append(chrom_begin_array[-1] - 10)
 				    elif locus == new_target_locus:
 					print
 					print 'MATCH'
 					coverage_data = new_next_line[header_index[0]]
 					in_file[locus] = coverage_data
+					print locus
+					print len(in_file)
 					last_target_locus.append(new_target_locus)
 					items_checked += 1 
 	return output
@@ -490,6 +493,12 @@ class Coverage_parser(Transcript):
 		    count += 1 
 		    genomic_for_plotting.write(str(count) + ',0' + '\n')
 	return str(filename)
+    
+    #remove intemediate files
+    def clean_up(self, target_directory=None):
+	for files in os.listdir(os.getcwd()):
+	    print files
+	
 
 
 class Argument_handler(Coverage_parser, Gnuplotter):
@@ -539,14 +548,15 @@ class Argument_handler(Coverage_parser, Gnuplotter):
 			print 'starting binary search'
                         #binary_search_output = instance.binary_search_coverage(transcript_range, v, k)
 			binary_search_output = instance.bin_search(transcript_range, v, k)
-			print 'generating plottable data'
-			print len(binary_search_output[0])
+			print 'generating plottable data '
+			print 'length bin search ' + str(len(binary_search_output[0]))
                         x = instance.plottable_genomic_data(binary_search_output, transcript_range, k, item)
                         extended = str(sorted_file) + '.extended'
-			print len(transcript_range)
+			print 'length transcript range ' + str((len(transcript_range)))
                         exons = str(sorted_file) + '.exons'
                         gnuplot_instance = Gnuplotter(exons, extended, x, k, item.gene_symbol, str(len(transcript_range)))
                         gnuplot_instance.coverage_plot()
+			instance.clean_up()
 
         else:
             print 'ERROR - Input criteria not satisfied.'
