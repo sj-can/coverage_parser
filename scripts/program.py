@@ -1,5 +1,8 @@
 import argparse, os, subprocess, fnmatch, Gnuplot, Gnuplot.funcutils
 
+#command to check cut off does not miss anything
+#cut -f2 iteration_file | sort | uniq -c | wc -l
+
 #Models a transcript using data from the Alamut genes file 
 class Gnuplotter():
     def __init__(self, interval_exons, interval_extended, plottable_coverage, exome_identifier, gene, length_of_extended_transcript):
@@ -229,14 +232,15 @@ class Coverage_parser(Transcript):
         split_line = whole_line.split()
         return split_line
 
+    def output_iterations(self, iteration, locus):
+	if iteration == 20:
+	    with open("iteration_file", "a") as outfile:
+	        outfile.write(str(iteration) + '\t' + str(locus) + '\n')
 
     #need to accoount for x/y chromosomes 
-    #need to account for if the data is not present (perhaps 20 iterations?)
     def bin_search(self, locus_array, coverage_file, exome_identifier):
         in_file = {}
         not_in_file = []
-        pos_iter_array = []
-        neg_iter_array = []
 	output = [in_file, not_in_file]
         with open(coverage_file, 'r') as coverage_file:
 	    header_index = self.match_sample_column_header(coverage_file, exome_identifier)
@@ -250,6 +254,8 @@ class Coverage_parser(Transcript):
 		seek_end = coverage_file.seek(0,2)
 		end_array.append(coverage_file.tell())
 		while items_checked < this_item:
+		    start_iter = 0
+		    end_iter = 0
 		    this_begin = begin_array[-1]
 		    this_end = end_array[-1]
 		    next_line = self.line_search_and_split(coverage_file, this_begin, this_end)
@@ -269,6 +275,7 @@ class Coverage_parser(Transcript):
 			    chrom_begin_array = [begin_array[-1]]
 			    chrom_end_array = [end_array[-1]]
 			    while locus != last_target_locus[-1]:
+				self.output_iterations(end_iter, locus)
 				new_next_line = self.line_search_and_split(coverage_file, chrom_begin_array[-1], chrom_end_array[-1])
 				new_target = new_next_line[0].split(':')
 				new_target_chrom = int(new_target[0])
@@ -286,11 +293,23 @@ class Coverage_parser(Transcript):
 					#identifies when the partial is the required line
 					if chrom_begin_array[-1] == chrom_begin_array[-2]:
 					    chrom_end_array.append(chrom_end_array[-1] - 10)
+					    start_iter += 1
+					    if start_iter == 21:
+						#capture_locus
+						not_in_file.append(locus)
+						#exit_loops
+						last_target_locus.append(locus)
+						items_checked += 1
 				    elif locus < new_target_locus:
 					chrom_end_array.append(coverage_file.tell())
 					#identifies when the partial is the required line
 					if chrom_end_array[-1] == chrom_end_array[-2]:
 					    chrom_begin_array.append(chrom_begin_array[-1] - 10)
+					    end_iter += 1
+					    if end_iter == 21:
+						not_in_file.append(locus)
+						last_target_locus.append(locus)
+						items_checked += 1
 				    elif locus == new_target_locus:
 					coverage_data = new_next_line[header_index[0]]
 					in_file[locus] = coverage_data
@@ -299,6 +318,7 @@ class Coverage_parser(Transcript):
 					items_checked += 1 
 			#if by chance the line is the required one when the chromosome is first checked
 			#elif chrom == target_chrom and locus == target_locus
+	print not_in_file
 	return output
 
     #where binary_search_output is [{infile locus : coverage} , [not in file locus]]
