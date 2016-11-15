@@ -16,22 +16,33 @@ class Gnuplotter():
     def coverage_plot(self):
         #plot 'test.dat' u 2:3:1 w labels point offset character 0,character 1 tc rgb "blue"
 	g = Gnuplot.Gnuplot(debug=1)
-	g('set terminal svg size 5000, 500')
-        file_name = str(self.gene) + '.svg'
-	output = 'set output ' + '"' + str(self.exome_identifier) + '_' + str(self.gene) + '.svg' + '"'
+	g('set terminal png size 4000, 1000')
+        #file_name = str(self.gene) + '.png'
+	output = 'set output ' + '"' + str(self.exome_identifier) + '_' + str(self.gene) + '.png' + '"'
+	cut_off_20x = "set object rect from 0,0 to " + str(self.length_of_extended_transcript) + ",0.275 fc rgb 'grey' fs solid 0.3"
 	g(output)
 	g("set datafile separator ','")
 	g('set style line 1 lt 1 lw 2 lc 3')
 	g("set style line 2 lt 2 lw 10 lc rgb 'navy'")
-	g("set style line 3 lt 3 lw 1 lc rgb 'black'")
-	g("set object rect from 0,0 to 8878,0.2")
-	g("set style rect back fc rgb 'beige' fs solid 1.0 noborder")
+	g("set style line 3 lt 3 lw 3 lc rgb 'black'")
+	g("set title " + "'" + str(self.gene) + "'" + " font  ',28'" )
+	g("set object rect from 0,0 to " + str(self.length_of_extended_transcript) + ",0.275 fc rgb 'grey' fs solid 0.3")
+	g('set xrange [0:' + str(self.length_of_extended_transcript)  + ']')
+        g("set ytics out")
+	g("set xlabel 'nucleotides' font ',22'")
+	g("set ylabel 'Coverage' font ',22'")
+	g("set tics font ', 18'")
 	g("min(a,b) = (a < b) ? a : b")
 	g("f(x) = min(1.0, (log(x + 10.0) - log(10.0)) / 4.0)")
 	g("set ytics ('0' f(0), '5' f(5), '10' f(10), '20' f(20), '40' f(40), '100' f(100), '200' f(200), '400' f(400), '800' f(800), '1600' f(1600))")
+
+	#plot "datafile.dat" using 1:3:xtic(2) with points
+
 	string_alternative = str(self.plottable_coverage)
-	g('plot ' + '"' + string_alternative + '"' + ' using 1:(f($2)) with lines ls 3, ' + '-0.1 title ' + '"' + self.gene + '"' + ' with lines ls 3, ' + '0.2 title ' + '"' + '20x' + '"' + ' with lines ls 3' + ', "' + self.interval_exons + '"' + ' with lines ls 2' + ', "' + self.interval_extended + '"' + ' with lines ls 1')
-         
+	#g( ' + '-0.1 title ' + '"' + self.gene + '"' + ' with lines ls 3, ' + '0.3 title ' + '"' + '20x' + '"' + ' with lines ls 3' + ', "' + self.interval_exons + '"' + ' with lines ls 2' + ', "' + self.interval_extended + '"' + ' with lines ls 1')
+        g('plot ' + '"' + string_alternative + '"' + ' using 1:(f($2)) with lines ls 3 title "", -0.1 title "", "' + str(self.interval_exons) + '" using 1:2:xtic(3) with lines ls 2')
+
+ 
 class Transcript():
 
     def __init__(self, alamut_line):
@@ -49,7 +60,7 @@ class Transcript():
         self.gene_stop = self.alamut_line[5]
         self.exons = {self.alamut_line[12] : [self.alamut_line[15], self.alamut_line[16]]}
 
-#split this into three funcitons
+   #split this into three funcitons
     def generate_transcript_range(self, input_file, transcript_instance):
 	extended = []
 	exons = []
@@ -97,7 +108,6 @@ class Transcript():
 		    elif extension2 > end_of_exon:
 		        exon_interval_file.write('\n')
         return range_array
-
 
 class Coverage_parser(Transcript):
 
@@ -275,7 +285,6 @@ class Coverage_parser(Transcript):
 			    chrom_begin_array = [begin_array[-1]]
 			    chrom_end_array = [end_array[-1]]
 			    while locus != last_target_locus[-1]:
-				self.output_iterations(end_iter, locus)
 				new_next_line = self.line_search_and_split(coverage_file, chrom_begin_array[-1], chrom_end_array[-1])
 				new_target = new_next_line[0].split(':')
 				new_target_chrom = int(new_target[0])
@@ -294,7 +303,7 @@ class Coverage_parser(Transcript):
 					if chrom_begin_array[-1] == chrom_begin_array[-2]:
 					    chrom_end_array.append(chrom_end_array[-1] - 10)
 					    start_iter += 1
-					    if start_iter == 21:
+					    if start_iter == 40:
 						#capture_locus
 						not_in_file.append(locus)
 						#exit_loops
@@ -306,7 +315,7 @@ class Coverage_parser(Transcript):
 					if chrom_end_array[-1] == chrom_end_array[-2]:
 					    chrom_begin_array.append(chrom_begin_array[-1] - 10)
 					    end_iter += 1
-					    if end_iter == 21:
+					    if end_iter == 40:
 						not_in_file.append(locus)
 						last_target_locus.append(locus)
 						items_checked += 1
@@ -401,11 +410,10 @@ class Argument_handler(Coverage_parser, Gnuplotter):
                         exons = str(sorted_file) + '.exons'
                         gnuplot_instance = Gnuplotter(exons, extended, x, k, item.gene_symbol, str(len(transcript_range)))
                         gnuplot_instance.coverage_plot()
-	    instance.clean_up()
+	    #instance.clean_up()
 
         else:
             print 'ERROR - Input criteria not satisfied.'
-
 
 if __name__ == '__main__':	    
     A = Argument_handler()
