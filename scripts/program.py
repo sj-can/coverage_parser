@@ -28,27 +28,24 @@ class Gnuplotter():
 	g("set title " + "'" + str(self.gene) + "'" + " font  ',28'" )
 	g("set object rect from 0,0 to " + str(self.length_of_extended_transcript) + ",0.275 fc rgb 'grey' fs solid 0.3")
 	g('set xrange [0:' + str(self.length_of_extended_transcript)  + ']')
-        g("set ytics out")
-	g("set xlabel 'nucleotides' font ',22'")
-	g("set ylabel 'Coverage' font ',22'")
+        g("set ytics nomirror out")
+	g("set xtics nomirror out")
+	g("set xtics rotate")
+	g("set xlabel 'nucleotides' offset 0,-2 font ',22'")
+	g("set ylabel 'Coverage' offset -1,0 font ',22'")
 	g("set tics font ', 18'")
 	g("min(a,b) = (a < b) ? a : b")
 	g("f(x) = min(1.0, (log(x + 10.0) - log(10.0)) / 4.0)")
 	g("set ytics ('0' f(0), '5' f(5), '10' f(10), '20' f(20), '40' f(40), '100' f(100), '200' f(200), '400' f(400), '800' f(800), '1600' f(1600))")
 	string_alternative = str(self.plottable_coverage)
-	#g( ' + '-0.1 title ' + '"' + self.gene + '"' + ' with lines ls 3, ' + '0.3 title ' + '"' + '20x' + '"' + ' with lines ls 3' + ', "' + self.interval_exons + '"' + ' with lines ls 2' + ', "' + self.interval_extended + '"' + ' with lines ls 1')
-        #g('plot ' + '"' + string_alternative + '"' + ' using 1:(f($2)) with lines ls 3 title "", -0.1 title "", "' + str(self.interval_exons) + '" using 1:2:xtic(3) with lines ls 2')
-	g('plot ' + '"' + string_alternative + '"' + ' using 1:(f($2)) with lines ls 3 title "", -0.1 title "", "' + str(self.interval_exons) + '" using 1:2 with lines ls 2, "' + str(self.interval_exons) + '" using 1:2:3 with labels offset 0,char 1 ')
-
+        g('plot ' + '"' + string_alternative + '"' + ' using 1:(f($2)) with lines ls 3 title "", -0.08 title "", "' + str(self.interval_exons) + '" using 1:2:xtic(4) with lines ls 2 title "", "' + str(self.interval_exons) + '" using 1:2:3 with labels offset 0,char 1 title "", "' + str(self.interval_extended) + '" using 1:2:xtic(3) with lines ls 1 title ""')
  
 class Transcript():
 
     def __init__(self, alamut_line):
         self.alamut_line = alamut_line
 	self.gene_symbol = self.alamut_line[1]
-        print 'gene_symbol = ' + self.gene_symbol
         self.transcript_id = self.alamut_line[7]
-        print 'trans_id = ' + self.transcript_id
         self.cds_start = self.alamut_line[10]
         self.cds_end = self.alamut_line[11]
         self.cds_length = int(self.cds_end) - int(self.cds_start) + 1
@@ -58,7 +55,7 @@ class Transcript():
         self.gene_stop = self.alamut_line[5]
         self.exons = {self.alamut_line[12] : [self.alamut_line[15], self.alamut_line[16]]}
 
-   #split this into three funcitons
+    #split this into three functions
     def generate_transcript_range(self, input_file, transcript_instance):
 	extended = []
 	exons = []
@@ -76,6 +73,7 @@ class Transcript():
 	extended_intervals = input_file + '.extended'
 	with open(extended_intervals, 'w') as extended_interval_file:
 	    count1 = 0
+	    cumulative_interval_count = -1
 	    for item in extended:
 		extension = 0
 		exon_length = item - 100
@@ -84,20 +82,32 @@ class Transcript():
 		    count1 += 1
 		    extension += 1
 		    if extension <= 50:
-		        extended_interval_file.write(str(count1)+',-0.08\n')
+		        cumulative_interval_count += 1
+			if cumulative_interval_count == 0 or cumulative_interval_count % 50 == 0:
+		            extended_interval_file.write(str(count1)+',-0.06," "\n')
+			else:
+			    extended_interval_file.write(str(count1)+',-0.06,\n')
 		    elif extension > 50 and extension <= end_of_exon:
 			extended_interval_file.write('\n')
 		    elif extension > end_of_exon:
-			extended_interval_file.write(str(count1)+',-0.08\n')
+			cumulative_interval_count += 1
+			if count1 == len(range_array):
+			    extended_interval_file.write(str(count1)+',-0.06," "\n')
+			else:
+			    extended_interval_file.write(str(count1)+',-0.06,\n')
 	exon_file_name = input_file + '.exons'
 	with open(exon_file_name, 'w') as exon_interval_file:
+	    cumulative_exon_length = 0
+	    reverse_cumulative_exon_length = sum(exons) + 1
+	    print reverse_cumulative_exon_length
 	    count2 = 0
 	    exon_count = 0
+	    reverse_exon_count = len(transcript_instance.exons)
 	    for item in extended:
 		exon_count += 1
 		extension2 = 0
-		exon_lengeth = item - 100
-		exon_middle = exon_lengeth/2
+		exon_length = item - 100
+		exon_middle = exon_length/2
 		end_of_exon = item - 50
 		for i in range(int(item)):
 		    count2 += 1
@@ -105,10 +115,31 @@ class Transcript():
 		    if extension2 <= 50:
 		        exon_interval_file.write('\n')
 		    elif extension2 > 50 and extension2 <= end_of_exon:
+			cumulative_exon_length += 1
+			reverse_cumulative_exon_length -= 1
+			#add exon numbering
 			if extension2 == exon_middle + 50:
-			    exon_interval_file.write(str(count2) + ',-0.08,' + str(exon_count) + '\n'), 
+			    if transcript_instance.__dict__['strand'] == '-1':
+			        exon_interval_file.write(str(count2) + ',-0.06,' + str(reverse_exon_count) + '\n'), 
+				reverse_exon_count -= 1
+			    else:
+			        exon_interval_file.write(str(count2) + ',-0.06,' + str(exon_count) + ',' + '\n')
+			#add start and stop cdna
+			elif extension2 == 51 or extension2 == end_of_exon:
+				print exon_length
+			    #if transcript_instance.__dict__['strand'] == '-1':
+			        if exon_length < 50:
+				    if extension2 == 51 and transcript_instance.__dict__['strand'] == '1':
+			                exon_interval_file.write(str(count2) + ',-0.06,,' + str(cumulative_exon_length) + '\n')
+				    if extension2 == end_of_exon and transcript_instance.__dict__['strand'] == '-1':
+				        exon_interval_file.write(str(count2) + ',-0.06,,' + str(reverse_cumulative_exon_length) + '\n')
+			        else:
+				    if transcript_instance.__dict__['strand'] == '1':
+				        exon_interval_file.write(str(count2) + ',-0.06,,' + str(cumulative_exon_length) + '\n')
+				    elif transcript_instance.__dict__['strand'] == '-1':
+					exon_interval_file.write(str(count2) + ',-0.06,,' + str(reverse_cumulative_exon_length) + '\n')
 			else:
-			    exon_interval_file.write(str(count2) + ',-0.08\n' )
+			    exon_interval_file.write(str(count2) + ',-0.06,,' + '\n')
 		    elif extension2 > end_of_exon:
 		        exon_interval_file.write('\n')
         return range_array
@@ -179,7 +210,7 @@ class Coverage_parser(Transcript):
         longest_transcripts = []
 	current_longest = []
         #iterate through the gene list provided
-        print 'identifying longest transcripts'
+        #print 'identifying longest transcripts'
         for gene in self.gene_list:
             this_gene = []
             current_longest = []
@@ -203,7 +234,7 @@ class Coverage_parser(Transcript):
         return longest_transcripts
 
     def exon_interval_file_creator(self, transcript_instance):
-        print 'creating exon interval files : ' + transcript_instance.__dict__['transcript_id']
+        #print 'creating exon interval files : ' + transcript_instance.__dict__['transcript_id']
 	if transcript_instance.__dict__['strand'] == '-1':
 	    output_name = transcript_instance.__dict__['transcript_id'] + '_reverse'
 	elif transcript_instance.__dict__['strand'] == '1':
@@ -219,7 +250,7 @@ class Coverage_parser(Transcript):
 	return output_name
 
     def sorter(self, file):
-	print 'sorting interval_file : ' + file
+	#print 'sorting interval_file : ' + file
 	if 'reverse' in file:
 	    command = ["sort", "-r", "-V", file]
 	else:
@@ -331,7 +362,7 @@ class Coverage_parser(Transcript):
 					items_checked += 1 
 			#if by chance the line is the required one when the chromosome is first checked
 			#elif chrom == target_chrom and locus == target_locus
-	print not_in_file
+	#print not_in_file
 	return output
 
     #where binary_search_output is [{infile locus : coverage} , [not in file locus]]
