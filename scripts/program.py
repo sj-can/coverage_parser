@@ -34,6 +34,7 @@ class Gnuplotter():
 	g("set xlabel 'nucleotides' offset 0,-2 font ',22'")
 	g("set ylabel 'Coverage' offset -1,0 font ',22'")
 	g("set tics font ', 18'")
+	g("set grid xtics front")
 	g("min(a,b) = (a < b) ? a : b")
 	g("f(x) = min(1.0, (log(x + 10.0) - log(10.0)) / 4.0)")
 	g("set ytics ('0' f(0), '5' f(5), '10' f(10), '20' f(20), '40' f(40), '100' f(100), '200' f(200), '400' f(400), '800' f(800), '1600' f(1600))")
@@ -386,7 +387,7 @@ class Coverage_parser(Transcript):
     #remove intemediate files
     def clean_up(self, target_directory=None):
 	for file in os.listdir(os.getcwd()):
-	    if file.startswith("NM_"):
+	    if file.startswith("NM_") or file.endswith("plottable.coverage"):
 		remove_command = ["rm", file]
 		subprocess.call(remove_command)
 
@@ -445,7 +446,7 @@ class Argument_handler(Coverage_parser, Gnuplotter):
                         exons = str(sorted_file) + '.exons'
                         gnuplot_instance = Gnuplotter(exons, extended, x, k, item.gene_symbol, str(len(transcript_range)))
                         gnuplot_instance.coverage_plot()
-	    #instance.clean_up()
+	    instance.clean_up()
 
         else:
             print 'ERROR - Input criteria not satisfied.'
