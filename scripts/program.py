@@ -35,12 +35,10 @@ class Gnuplotter():
 	g("min(a,b) = (a < b) ? a : b")
 	g("f(x) = min(1.0, (log(x + 10.0) - log(10.0)) / 4.0)")
 	g("set ytics ('0' f(0), '5' f(5), '10' f(10), '20' f(20), '40' f(40), '100' f(100), '200' f(200), '400' f(400), '800' f(800), '1600' f(1600))")
-
-	#plot "datafile.dat" using 1:3:xtic(2) with points
-
 	string_alternative = str(self.plottable_coverage)
 	#g( ' + '-0.1 title ' + '"' + self.gene + '"' + ' with lines ls 3, ' + '0.3 title ' + '"' + '20x' + '"' + ' with lines ls 3' + ', "' + self.interval_exons + '"' + ' with lines ls 2' + ', "' + self.interval_extended + '"' + ' with lines ls 1')
-        g('plot ' + '"' + string_alternative + '"' + ' using 1:(f($2)) with lines ls 3 title "", -0.1 title "", "' + str(self.interval_exons) + '" using 1:2:xtic(3) with lines ls 2')
+        #g('plot ' + '"' + string_alternative + '"' + ' using 1:(f($2)) with lines ls 3 title "", -0.1 title "", "' + str(self.interval_exons) + '" using 1:2:xtic(3) with lines ls 2')
+	g('plot ' + '"' + string_alternative + '"' + ' using 1:(f($2)) with lines ls 3 title "", -0.1 title "", "' + str(self.interval_exons) + '" using 1:2 with lines ls 2, "' + str(self.interval_exons) + '" using 1:2:3 with labels offset 0,char 1 ')
 
  
 class Transcript():
@@ -86,17 +84,20 @@ class Transcript():
 		    count1 += 1
 		    extension += 1
 		    if extension <= 50:
-		        extended_interval_file.write(str(count1)+',-0.05\n')
+		        extended_interval_file.write(str(count1)+',-0.08\n')
 		    elif extension > 50 and extension <= end_of_exon:
 			extended_interval_file.write('\n')
 		    elif extension > end_of_exon:
-			extended_interval_file.write(str(count1)+',-0.05\n')
+			extended_interval_file.write(str(count1)+',-0.08\n')
 	exon_file_name = input_file + '.exons'
 	with open(exon_file_name, 'w') as exon_interval_file:
 	    count2 = 0
+	    exon_count = 0
 	    for item in extended:
+		exon_count += 1
 		extension2 = 0
 		exon_lengeth = item - 100
+		exon_middle = exon_lengeth/2
 		end_of_exon = item - 50
 		for i in range(int(item)):
 		    count2 += 1
@@ -104,7 +105,10 @@ class Transcript():
 		    if extension2 <= 50:
 		        exon_interval_file.write('\n')
 		    elif extension2 > 50 and extension2 <= end_of_exon:
-			exon_interval_file.write(str(count2)+',-0.05\n')
+			if extension2 == exon_middle + 50:
+			    exon_interval_file.write(str(count2) + ',-0.08,' + str(exon_count) + '\n'), 
+			else:
+			    exon_interval_file.write(str(count2) + ',-0.08\n' )
 		    elif extension2 > end_of_exon:
 		        exon_interval_file.write('\n')
         return range_array
