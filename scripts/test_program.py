@@ -6,29 +6,38 @@ from nose.tools import assert_not_equal
 from nose.tools import assert_raises
 from nose.tools import raises
 
+def setup_module():
+    print(__name__, ': setup_module() ~~~~~~~~~~~~~~~~~~~~~~')
+ 
+def teardown_module():
+    print(__name__, ': teardown_module() ~~~~~~~~~~~~~~~~~~~')
 
+#creates the TestArgument_handler object, sets up the class method then set up for each test, then the test, then the teardowns. 
 class TestArgument_handler(object):
 
     @classmethod
     def setup_class(cls):
 	print(__name__, ': TestArgument_handler.setup_class() ----------')
 
+
     @classmethod
     def teardown_class(cls):
 	print(__name__, ': TestArgument_handler.teardown_class() -------')
-	os.remove('WE0345_KCNJ11.plottable.coverage')
-	os.remove('NM_001166290.1')
-	os.remove('NM_001166290.1.intervals')
-	os.remove('NM_001166290.1.intervals.exons')
-	os.remove('NM_001166290.1.intervals.extended')
-	os.remove('WE0345_KCNJ11.svg')
+	#remove intemediate files
+        for file in os.listdir(os.getcwd()):
+            if file.startswith("NM_") or file.endswith("plottable.coverage"):
+                remove_command = ["rm", file]
+                subprocess.call(remove_command)
+	os.remove('WE0345_KCNJ11.png')
 
+    #occurs before each test method
     def setUp(self):
 	with open('test_exome_list', 'w') as test_exomes:
 	    test_exomes.write('WE0345')
 	with open('test_gene_list', 'w') as test_gene:
 	    test_gene.write('KCNJ11')
 
+    #occurs after each test method
     def teardown(self):
 	os.remove('test_exome_list')
 	os.remove('test_gene_list')
@@ -49,7 +58,7 @@ class TestArgument_handler(object):
     def test_handler(self):
         A =  Argument_handler('-s', 'test_exome_list', '-g', 'test_gene_list')
         A.handler()
-        expected_transcript = os.path.isfile('NM_001166290.1')
+        expected_transcript = os.path.isfile('NM_000525.3_reverse')
 	assert_equal(expected_transcript, True)
 	if expected_transcript:
 	    command = ['wc', '-l', 'WE0345_KCNJ11.plottable.coverage']

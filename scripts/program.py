@@ -446,7 +446,7 @@ class Argument_handler(Coverage_parser, Gnuplotter):
                         exons = str(sorted_file) + '.exons'
                         gnuplot_instance = Gnuplotter(exons, extended, x, k, item.gene_symbol, str(len(transcript_range)))
                         gnuplot_instance.coverage_plot()
-	    instance.clean_up()
+#	    instance.clean_up()
 
         else:
             print 'ERROR - Input criteria not satisfied.'
