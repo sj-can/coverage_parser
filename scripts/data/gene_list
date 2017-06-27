@@ -1,1 +1,6 @@
-DLL4
+#add the genes which require the coverage checking here
+ABCC8
+KCNJ11
+HNF4A
+TUBB3
+GCK
