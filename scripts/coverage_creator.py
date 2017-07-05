@@ -14,6 +14,7 @@ class Gnuplotter():
 	self.gene = gene
 	self.length_of_extended_transcript = length_of_extended_transcript
 
+    #funtion to plot each coverage plot 
     def coverage_plot(self):
 	g = Gnuplot.Gnuplot(debug=1)
 	g('set terminal png size 4000, 1000')
@@ -40,7 +41,8 @@ class Gnuplotter():
 	g("set ytics ('0' f(0), '5' f(5), '10' f(10), '20' f(20), '40' f(40), '100' f(100), '200' f(200), '400' f(400), '800' f(800), '1600' f(1600))")
 	string_alternative = str(self.plottable_coverage)
         g('plot ' + '"' + string_alternative + '"' + ' using 1:(f($2)) with lines ls 3 title "", -0.08 title "", "' + str(self.interval_exons) + '" using 1:2:xtic(4) with lines ls 2 title "", "' + str(self.interval_exons) + '" using 1:2:3 with labels offset 0,char 1 title "", "' + str(self.interval_extended) + '" using 1:2:xtic(3) with lines ls 1 title ""')
- 
+
+#models the transcript as supplied in the alamut database file
 class Transcript():
 
     def __init__(self, alamut_line):
@@ -56,7 +58,11 @@ class Transcript():
         self.gene_stop = self.alamut_line[5]
         self.exons = {self.alamut_line[12] : [self.alamut_line[15], self.alamut_line[16]]}
 
-    #split this into three functions
+    #funtion to generate the transcript range, exon range and intron ranges.
+    #that is, coding exons +/- 50bps
+    #These are then plotted as two data series.
+    #also detects forward or reverse strand and rvereses as appropriate for plotting
+    #returns an array of the ranges
     def generate_transcript_range(self, input_file, transcript_instance):
 	extended = []
 	exons = []
@@ -145,21 +151,25 @@ class Transcript():
 		        exon_interval_file.write('\n')
         return range_array
 
+#the coverage parser object returns the transcript instances and coveage metric files to be interrogated.  
 class Coverage_parser(Transcript):
 
     transcript_instances = []
     exome_coverage_files = ''
-
+    
+    #init takes sample names, gene names into memory
     def __init__(self, sample_name_file, gene_name_file, alamut_file):
         self.sample_list = self.list_from_file(sample_name_file)
         self.gene_list = self.list_from_file(gene_name_file)
 	self.alamut_file = alamut_file
 
+    #funtion to quickly strip and split lines form input file
     def line_strip_split(self, line):
         line = line.strip('\n')
         split_line = line.split()
         return split_line
 
+    #turn a file into a 2d array where each line is an array 
     def list_from_file(self, input_file):
         new_list = []
         with open(input_file, 'r') as inputfile:
@@ -168,6 +178,8 @@ class Coverage_parser(Transcript):
                 new_list.append(line)
         return new_list
 
+    #uses accompanying bash script to identify the required coverage file
+    #much faster than a python equivalent
     def exome_coverage_finder_bash(self):
 	exome_coverage_files = []
         print 'finding coverage files for : '
@@ -185,6 +197,7 @@ class Coverage_parser(Transcript):
         self.exome_coverage_files = exome_coverage_files
         return exome_coverage_files
 
+    #finds the intervals for each gene and intitialises a transcript instance.
     def find_gene_intervals(self):
         lines_parsed = 0
         with open(self.alamut_file, 'r') as alamut_file:
@@ -206,12 +219,10 @@ class Coverage_parser(Transcript):
 			        additional_transcript_instance = Transcript(line)
 			        self.transcript_instances.append(additional_transcript_instance)
 
-    #need to account for it they are equal
+    #returns the longeest transcript from those available
     def longest_transcript(self):
         longest_transcripts = []
 	current_longest = []
-        #iterate through the gene list provided
-        #print 'identifying longest transcripts'
         for gene in self.gene_list:
             this_gene = []
             current_longest = []
@@ -234,6 +245,7 @@ class Coverage_parser(Transcript):
             print str(item.__dict__['gene_symbol']) + ' ' + str(item.__dict__['transcript_id']) + '\n'
         return longest_transcripts
 
+    #takes transcript instance and creates output file 
     def exon_interval_file_creator(self, transcript_instance):
         #print 'creating exon interval files : ' + transcript_instance.__dict__['transcript_id']
 	if transcript_instance.__dict__['strand'] == '-1':
@@ -250,8 +262,8 @@ class Coverage_parser(Transcript):
                     output_file.write(output)
 	return output_name
 
+    #funciton to sort files as requried for forward or reverse plotting of transcript coordinates
     def sorter(self, file):
-	#print 'sorting interval_file : ' + file
 	if 'reverse' in file:
 	    command = ["sort", "-r", "-V", file]
 	else:
@@ -283,49 +295,62 @@ class Coverage_parser(Transcript):
 	    with open("iteration_file", "a") as outfile:
 	        outfile.write(str(iteration) + '\t' + str(locus) + '\n')
 
-    #need to accoount for x/y chromosomes 
+    #binary search to enable rapid look up from coverage file.
+    #first pass searches based on chromosome
+    #second pass searches based on coordinate
+    #ranges are adjusted as required, one search for each target locus
+    #byte offset requried to account for reading from centre of line  
     def bin_search(self, locus_array, coverage_file, exome_identifier):
         in_file = {}
         not_in_file = []
 	output = [in_file, not_in_file]
+        #opens target coverage file into memory
         with open(coverage_file, 'r') as coverage_file:
+        #finds the headers
 	    header_index = self.match_sample_column_header(coverage_file, exome_identifier)
 	    items_checked = 0
 	    this_item = 0
+	    #iterates through locus targets required
 	    for item in locus_array:
 	        this_item += 1
+	    #arrays to define lookup logic i.e. when to move through loop
 	 	last_target_locus = []
 		end_array = []
 		begin_array = [0]
+		#find the end of the file 
 		seek_end = coverage_file.seek(0,2)
 		end_array.append(coverage_file.tell())
+		#switch to account for when all the searches have been completed 
 		while items_checked < this_item:
 		    start_iter = 0
 		    end_iter = 0
 		    this_begin = begin_array[-1]
 		    this_end = end_array[-1]
+		    #check the data in the line
 		    next_line = self.line_search_and_split(coverage_file, this_begin, this_end)
-		    #perhaps include number of characters in chromosome to avoid match between e.g. 6: and 16:
 		    if ':' in next_line[0]:
 			split_locus = split_locus = next_line[0].split(':')
 			chrom = int(item[0])
 			locus = int(item[1])
 			target_chrom = int(split_locus[0])
 		        target_locus = int(split_locus[1])
+		    #logic to define if target chromosome and adjust start and end coordianates
 			if chrom > target_chrom:
 			    begin_array.append(coverage_file.tell())
 			elif chrom < target_chrom:
 			    end_array.append(coverage_file.tell())
+			#if correct chromosome, redefine the start and end
 			elif chrom == target_chrom:
 			    last_target_locus = [target_locus]
 			    chrom_begin_array = [begin_array[-1]]
 			    chrom_end_array = [end_array[-1]]
+			    #switch to check that the last searched locus hasn't been found
 			    while locus != last_target_locus[-1]:
 				new_next_line = self.line_search_and_split(coverage_file, chrom_begin_array[-1], chrom_end_array[-1])
 				new_target = new_next_line[0].split(':')
 				new_target_chrom = int(new_target[0])
 				new_target_locus = int(new_target[1])
-				#check chromosome is still the same
+				#check chromosome is still the same, keeps the start and end byte sizes correct
 				if chrom < new_target_chrom:
 				    #move the end to the current location
 				    chrom_end_array.append(coverage_file.tell())
@@ -360,13 +385,11 @@ class Coverage_parser(Transcript):
 					in_file[locus] = coverage_data
 					#exit loops 
 					last_target_locus.append(new_target_locus)
-					items_checked += 1 
-			#if by chance the line is the required one when the chromosome is first checked
-			#elif chrom == target_chrom and locus == target_locus
-	#print not_in_file
+					items_checked += 1
 	return output
 
     #where binary_search_output is [{infile locus : coverage} , [not in file locus]]
+    #writes to a plottable coverage file. This is another data series plotted in addition to the exon target files
     def plottable_genomic_data(self, binary_search_data, range_array, exome_identifier, transcript_instance):
 	filename = exome_identifier + '_' + transcript_instance.gene_symbol + '.plottable.coverage'
 	with open(filename, 'w') as genomic_for_plotting:
@@ -391,6 +414,7 @@ class Coverage_parser(Transcript):
 		remove_command = ["rm", file]
 		subprocess.call(remove_command)
 
+#models the input arguments and calls the program if all inputs are satisfied
 class Argument_handler(Coverage_parser, Gnuplotter):
     def __init__(self, s=None, sample_file=None, g=None, gene_file=None):
 	if s and sample_file:
@@ -409,7 +433,7 @@ class Argument_handler(Coverage_parser, Gnuplotter):
         parser.add_argument('-g', action='store', dest='gene_names', help='path to file containing the genes to be analysed')
         return parser
 
-    #handle if no sample path is given nonetype error
+    
     def handler(self):
         switch = 0
         if 'sample_names' in self.arg_dict.keys() and os.path.isfile(self.arg_dict['sample_names']):
@@ -449,7 +473,7 @@ class Argument_handler(Coverage_parser, Gnuplotter):
 #	    instance.clean_up()
 
         else:
-            print 'ERROR - Input criteria not satisfied.'
+            print 'ERROR - Input criteria not satisfied. Please check data files have one sample/gene per line'
 
 if __name__ == '__main__':	    
     A = Argument_handler()
