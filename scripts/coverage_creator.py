@@ -14,7 +14,7 @@ class Gnuplotter():
 	self.gene = gene
 	self.length_of_extended_transcript = length_of_extended_transcript
 
-    #funtion to plot each coverage plot 
+    #funtion to plot each coverage plot, uses gnuplot wrapper 
     def coverage_plot(self):
 	g = Gnuplot.Gnuplot(debug=1)
 	g('set terminal png size 4000, 1000')
@@ -40,6 +40,7 @@ class Gnuplotter():
 	g("f(x) = min(1.0, (log(x + 10.0) - log(10.0)) / 4.0)")
 	g("set ytics ('0' f(0), '5' f(5), '10' f(10), '20' f(20), '40' f(40), '100' f(100), '200' f(200), '400' f(400), '800' f(800), '1600' f(1600))")
 	string_alternative = str(self.plottable_coverage)
+	    #final plot command
         g('plot ' + '"' + string_alternative + '"' + ' using 1:(f($2)) with lines ls 3 title "", -0.08 title "", "' + str(self.interval_exons) + '" using 1:2:xtic(4) with lines ls 2 title "", "' + str(self.interval_exons) + '" using 1:2:3 with labels offset 0,char 1 title "", "' + str(self.interval_extended) + '" using 1:2:xtic(3) with lines ls 1 title ""')
 
 #models the transcript as supplied in the alamut database file
@@ -162,6 +163,7 @@ class Coverage_parser(Transcript):
         self.sample_list = self.list_from_file(sample_name_file)
         self.gene_list = self.list_from_file(gene_name_file)
 	self.alamut_file = alamut_file
+	assert os.path.isfile(self.alamut_file), 'Alamut file is not in specified location'
 
     #funtion to quickly strip and split lines form input file
     def line_strip_split(self, line):
@@ -188,18 +190,23 @@ class Coverage_parser(Transcript):
    	for exome_sample in self.sample_list:
 	    exome_sample = exome_sample.strip('\n')
 	    coverage_dict = {}
-	    command = ["bash", "all_exome_coverage_files", exome_sample]
-	    process = subprocess.Popen(command, stdout=subprocess.PIPE)
-	    cov_file_path = process.communicate()[0].strip('\n')
-	    #communicate output
-	    coverage_dict[exome_sample] = cov_file_path
-            exome_coverage_files.append(coverage_dict)
-        self.exome_coverage_files = exome_coverage_files
+	    try:
+	        command = ["bash", "all_exome_coverage_files", exome_sample]
+	        process = subprocess.Popen(command, stdout=subprocess.PIPE)
+	        cov_file_path = process.communicate()[0].strip('\n')
+	        #communicate output
+	        coverage_dict[exome_sample] = cov_file_path
+                exome_coverage_files.append(coverage_dict)
+                self.exome_coverage_files = exome_coverage_files
+                assert len(exome_coverage_files) > 0, 'No exome coverage file identified by bash script, coverage connot be plotted'
+            except:
+                print('exome coverage finder error, ensure bash script all_exome_coverage_files in same directory as execution')
         return exome_coverage_files
 
     #finds the intervals for each gene and intitialises a transcript instance.
     def find_gene_intervals(self):
         lines_parsed = 0
+        checked_genes = []
         with open(self.alamut_file, 'r') as alamut_file:
             for line in alamut_file:
                 for gene in self.gene_list:
@@ -209,6 +216,7 @@ class Coverage_parser(Transcript):
 			if gene == line[1] or gene == line[7]:
                             initial_transcript_instance = Transcript(line)  
 			    self.transcript_instances.append(initial_transcript_instance)
+                            checked_genes.append(gene)
 		    elif gene in line and len(self.transcript_instances) > 0:
 		        line = line.split()
 			#if gene is symbol or transcript
@@ -218,6 +226,10 @@ class Coverage_parser(Transcript):
 			    if self.transcript_instances[-1].transcript_id != line[7]:
 			        additional_transcript_instance = Transcript(line)
 			        self.transcript_instances.append(additional_transcript_instance)
+                                checked_gene.append(gene)
+        for gene in gene_list:
+            if gene not in checked_genes:
+                print gene + ' not found in alamut_file, check gene nomenclature for synonyms, remove form analysis or update alamut file'
 
     #returns the longeest transcript from those available
     def longest_transcript(self):
@@ -252,8 +264,12 @@ class Coverage_parser(Transcript):
 	    output_name = transcript_instance.__dict__['transcript_id'] + '_reverse'
 	elif transcript_instance.__dict__['strand'] == '1':
 	    output_name = transcript_instance.__dict__['transcript_id']
+        else:
+            print "No strand information for transcript, output name is foreward by default"
+            output_name = transcript_instance.__dict__['transcript_id']
         with open(output_name, 'w') as output_file:
             exon_dictionary = transcript_instance.__dict__['exons']
+            assert not bool(exon_dict), 'There are no exons in this transcript, check columns of alamut file align with transcript class'
             for k,v in exon_dictionary.iteritems():
 	        if int(v[0]) or int(v[1]) != 0:
                     plus_50 = int(v[1]) + 50
