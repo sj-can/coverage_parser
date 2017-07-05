@@ -1,20 +1,20 @@
 import argparse, os, subprocess, fnmatch, Gnuplot, Gnuplot.funcutils
 
-#command to check cut off does not miss anything
-#cut -f2 iteration_file | sort | uniq -c | wc -l
+#the following code can be execute with 
+#python coverage_creator.py -s sample_file -g gene_file
+#and will produce a coverage plot for each gene for every sample.
 
 #Models a transcript using data from the Alamut genes file 
 class Gnuplotter():
     def __init__(self, interval_exons, interval_extended, plottable_coverage, exome_identifier, gene, length_of_extended_transcript):
         self.interval_exons = interval_exons
-	self.interval_extended = interval_extended
-	self.plottable_coverage = str(plottable_coverage)
+        self.interval_extended = interval_extended
+        self.plottable_coverage = str(plottable_coverage)
 	self.exome_identifier = exome_identifier
 	self.gene = gene
 	self.length_of_extended_transcript = length_of_extended_transcript
 
     def coverage_plot(self):
-        #plot 'test.dat' u 2:3:1 w labels point offset character 0,character 1 tc rgb "blue"
 	g = Gnuplot.Gnuplot(debug=1)
 	g('set terminal png size 4000, 1000')
         #file_name = str(self.gene) + '.png'
